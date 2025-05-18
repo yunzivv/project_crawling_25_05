@@ -6,12 +6,21 @@ from selenium.webdriver.chrome.service import Service
 import time
 
 # 크롬 드라이버 설정
+# options = webdriver.ChromeOptions()
+# options.add_argument("--headless")
+# options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36")
+# options.add_argument("--disable-blink-features=AutomationControlled")
+# service = Service('./drivers/chromedriver.exe')
+# driver = webdriver.Chrome(service=service)
+
+# 설정
 options = webdriver.ChromeOptions()
-options.add_argument("--headless")
-options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36")
+options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/117 Safari/537.36")
 options.add_argument("--disable-blink-features=AutomationControlled")
-service = Service('./drivers/chromedriver.exe')
-driver = webdriver.Chrome(service=service)
+driver = webdriver.Chrome(options=options)
+
+# 자격/취득 포함된 링크 저장용
+qualified_links = []
 
 # IP 주소 확인
 import requests
@@ -19,11 +28,12 @@ ip = requests.get("https://api.ipify.org").text
 print(f"현재 IP 주소: {ip}")
 
 # 검색할 키워드
-keywords = ["업무", "인원"]
+keywords = ["채용", "인원"]
 
-# 사람인 첫 페이지
-base_url = "https://www.saramin.co.kr/zf_user/jobs/list/domestic?page="
+# 잡코리아 첫 페이지
+base_url = "https://www.jobkorea.co.kr/recruit/joblist?page="
 
+# 링크 저장
 matched_links = []
 
 # 1~3페이지 예시로 진행 (전체로 하려면 페이지 수만 늘리면 됨)
@@ -33,14 +43,14 @@ for page in range(1, 4):
     time.sleep(3)
 
     # 공고 목록에서 a 태그 추출
-    job_links = driver.find_elements(By.CSS_SELECTOR, "div.area_job > h2.job_tit > a.str_tit ")
+    job_links = driver.find_elements(By.CSS_SELECTOR, "td.tplTit > div.titBx > strong > a")
 
     for link in job_links:
         href = link.get_attribute("href")
         if href:
             try:
                 driver.get(href)
-                time.sleep(1.5)
+                time.sleep(3)
 
                 page_text = driver.page_source
 
