@@ -32,56 +32,59 @@ links = [elem.get_attribute('href') for elem in elements]
 # 저장 디렉토리 생성
 os.makedirs("screenshots", exist_ok=True)
 
-# 첫번째 공고 바디 저장
-element = driver.find_element(By.CSS_SELECTOR, ".user_content")
 
 # 하나씩 방문하면서 OCR 검사 + 저장
 for i, link in enumerate(links):
     driver.get(link)
     time.sleep(3)
 
-    # CDP 기반 전체 화면 캡처
-    rect = driver.execute_script("""
-        const elem = arguments[0];
-        const rect = elem.getBoundingClientRect();
-        return {
-            x: rect.x,
-            y: rect.y,
-            width: rect.width,
-            height: rect.height
-        };
+    try:
+        # 공고 상세 페이지에서 .user_content 요소 찾기
+        element = driver.find_element(By.CSS_SELECTOR, ".user_content")
+
+        # 요소가 보이도록 스크롤
+        driver.execute_script("arguments[0].scrollIntoView(true);", element)
+        time.sleep(1)
+
+        # 요소 위치 및 크기 계산
+        rect = driver.execute_script("""
+            const rect = arguments[0].getBoundingClientRect();
+            return {
+                x: rect.left,
+                y: rect.top,
+                width: rect.width,
+                height: rect.height
+            };
         """, element)
-    # page_rect = driver.execute_cdp_cmd('Page.getLayoutMetrics', {})
-    # screenshot_config = {
-    #     'captureBeyondViewport': True,
-    #     'fromSurface': True,
-    #     'clip': {
-    #         'width': page_rect['cssContentSize']['width'],
-    #         'height': page_rect['cssContentSize']['height'],
-    #         'x': 0,
-    #         'y': 0,
-    #         'scale': 1
-    #     }
-    # }
-    base64_png = driver.execute_cdp_cmd('Page.captureScreenshot', rect)
 
-    # 임시 파일 저장
-    temp_path = f"screenshots/temp_{i}.png"
-    with open(temp_path, "wb") as f:
-        f.write(base64.urlsafe_b64decode(base64_png['data']))
+        # 요소만 캡처
+        screenshot = driver.execute_cdp_cmd("Page.captureScreenshot", {
+            "clip": {
+                "x": rect["x"],
+                "y": rect["y"],
+                "width": rect["width"],
+                "height": rect["height"],
+                "scale": 1
+            },
+            "fromSurface": True
+        })
 
-    # OCR로 텍스트 추출
-    text = pytesseract.image_to_string(Image.open(temp_path), lang='kor')
+        # 임시 파일 저장
+        temp_path = f"screenshots/temp_{i}.png"
+        with open(temp_path, "wb") as f:
+            f.write(base64.b64decode(screenshot['data']))
 
-    keywords = ["자격", "자격증", "소지자", "취득"]
+        # OCR 분석
+        text = pytesseract.image_to_string(Image.open(temp_path), lang='kor')
 
-    if any(keyword in text for keyword in keywords):
-        save_path = f"screenshots/공고_{i+1}.png"
-        os.rename(temp_path, save_path)
-        print(f"[통과]: {save_path}")
-    else:
-        os.remove(temp_path)
-        print(f"[불통과]: {link}")
+        keywords = ["자격", "자격증", "소지자", "취득"]
+        if any(keyword in text for keyword in keywords):
+            save_path = f"screenshots/공고_{i+1}.png"
+            os.rename(temp_path, save_path)
+            print(f"[통과]: {save_path}")
+        else:
+            os.remove(temp_path)
+            print(f"[불통과]: {link}")
 
-driver.quit()
-
+    except Exception as e:
+        print(f"[오류 발생 - 건너뜀]: {link}\n{e}")
