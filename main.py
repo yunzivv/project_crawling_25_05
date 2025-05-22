@@ -42,11 +42,19 @@ for i, link in enumerate(links):
 
     # .user_content 요소 찾기
     try:
-        user_content_element = driver.find_element(By.CLASS_NAME, "user_content")
+        # ifram 찾고 안으로 들어가기
+        iframe = driver.find_element(By.TAG_NAME, "iframe")
+        driver.switch_to.frame(iframe)
 
+        # 요소 찾기
+        element = driver.find_element(By.CLASS_NAME, "user_content")
+        
          # .user_content 요소 스크린샷
         temp_path = f"screenshots/temp_{i}.png"
-        user_content_element.screenshot(temp_path)
+        element.screenshot(temp_path)
+
+        # ifram 빠져나오기
+        driver.switch_to.default_content()
 
         # OCR 텍스트 추출
         text = pytesseract.image_to_string(Image.open(temp_path), lang='kor')
@@ -62,6 +70,7 @@ for i, link in enumerate(links):
 
     except Exception as e:
         print(f"[오류 발생 - 요소 찾을 수 없음]: {link} - {e}")
+        break
 
     except Exception as e:
         print(f"[오류 발생 - 링크 접속 실패]: {link}\n{e}")
