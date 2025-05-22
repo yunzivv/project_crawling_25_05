@@ -42,38 +42,38 @@ for i, link in enumerate(links):
 
     # .user_content 요소 찾기
     try:
-        # ifram 찾고 안으로 들어가기
-        iframe = driver.find_element(By.TAG_NAME, "iframe")
-        driver.switch_to.frame(iframe)
+        iframe = driver.find_element(By.TAG_NAME, 'iframe')
+        driver.switch_to.frame(iframe)  # iframe으로 전환
 
-        # 요소 찾기
-        element = driver.find_element(By.CLASS_NAME, "user_content")
-        
-         # .user_content 요소 스크린샷
-        temp_path = f"screenshots/temp_{i}.png"
-        element.screenshot(temp_path)
+        # .user_content 요소 찾기
+        user_content_elements = driver.find_elements(By.CLASS_NAME, "user_content")
+        if user_content_elements:
+        # 첫 번째 .user_content 요소 캡처
+            user_content_element = user_content_elements[0]
+            temp_path = f"screenshots/temp_{i}.png"
+            user_content_element.screenshot(temp_path)
 
-        # ifram 빠져나오기
-        driver.switch_to.default_content()
-
-        # OCR 텍스트 추출
-        text = pytesseract.image_to_string(Image.open(temp_path), lang='kor')
+            # OCR 텍스트 추출
+            text = pytesseract.image_to_string(Image.open(temp_path), lang='kor')
 
             # 키워드 필터링
-        if any(keyword in text for keyword in keywords):
-            save_path = f"screenshots/공고_{i+1}.png"
-            os.rename(temp_path, save_path)
-            print(f"[통과]: {save_path}")
+            if any(keyword in text for keyword in keywords):
+                save_path = f"screenshots/공고_{i+1}.png"
+                os.rename(temp_path, save_path)
+                print(f"[통과]: {save_path}")
+            else:
+                os.remove(temp_path)
+                print(f"[불통과]: {link}")
         else:
-            os.remove(temp_path)
-            print(f"[불통과]: {link}")
+            print(f"[오류 발생 - .user_content 요소 없음]: {link}")
+
+        # 작업이 끝난 후 iframe 밖으로 나오기
+        driver.switch_to.default_content()
 
     except Exception as e:
-        print(f"[오류 발생 - 요소 찾을 수 없음]: {link} - {e}")
-        break
+        print(f"[오류 발생 - iframe 처리 중 오류]: {link} - {e}")
 
     except Exception as e:
         print(f"[오류 발생 - 링크 접속 실패]: {link}\n{e}")
-        break
 
 driver.quit()
