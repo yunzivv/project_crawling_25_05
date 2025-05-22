@@ -37,41 +37,62 @@ keywords = ["자격", "자격증", "소지자", "취득"]
 
 # 하나씩 방문하면서 OCR 검사 + 저장
 for i, link in enumerate(links):
-    driver.get(link)
-    time.sleep(3)
-
-    # .user_content 요소 찾기
     try:
-        iframe = driver.find_element(By.TAG_NAME, 'iframe')
-        driver.switch_to.frame(iframe)  # iframe으로 전환
+        driver.get(link)
+        time.sleep(3)  # 페이지 로딩 대기
 
-        # .user_content 요소 찾기
-        user_content_elements = driver.find_elements(By.CLASS_NAME, "user_content")
-        if user_content_elements:
-        # 첫 번째 .user_content 요소 캡처
-            user_content_element = user_content_elements[0]
-            temp_path = f"screenshots/temp_{i}.png"
-            user_content_element.screenshot(temp_path)
+        # iframe이 있다면 switch_to.frame()으로 해당 iframe으로 전환
+        try:
+            iframe = driver.find_element(By.TAG_NAME, 'iframe')
+            driver.switch_to.frame(iframe)  # iframe으로 전환
 
-            # OCR 텍스트 추출
-            text = pytesseract.image_to_string(Image.open(temp_path), lang='kor')
+            # .user_content 요소 찾기
+            user_content_elements = driver.find_elements(By.CLASS_NAME, "user_content")
+            if user_content_elements:
+                # 첫 번째 .user_content 요소 찾기
+                user_content_element = user_content_elements[0]
 
-            # 키워드 필터링
-            if any(keyword in text for keyword in keywords):
-                save_path = f"screenshots/공고_{i+1}.png"
-                os.rename(temp_path, save_path)
-                print(f"[통과]: {save_path}")
+                # 요소의 위치와 크기 가져오기
+                location = user_content_element.location
+                size = user_content_element.size
+                print(f"위치: {location}, 크기: {size}")
+
+                # 전체 화면 캡처
+                screenshot_path = f"screenshots/full_{i}.png"
+                driver.save_screenshot(screenshot_path)
+
+                # PIL로 캡처된 이미지를 열고, 요소 영역만 잘라내기
+                img = Image.open(screenshot_path)
+                left = location['x']
+                top = location['y']
+                right = left + size['width']
+                bottom = top + size['height']
+
+                # 영역 자르기
+                img = img.crop((left, top, right, bottom))
+                temp_path = f"screenshots/temp_{i}.png"
+                img.save(temp_path)
+
+                # OCR 텍스트 추출
+                text = pytesseract.image_to_string(img, lang='kor')
+
+                # 키워드 필터링
+                if any(keyword in text for keyword in keywords):
+                    save_path = f"screenshots/공고_{i+1}.png"
+                    os.rename(temp_path, save_path)
+                    print(f"[통과]: {save_path}")
+                else:
+                    os.remove(temp_path)
+                    print(f"[불통과]: {link}")
+
             else:
-                os.remove(temp_path)
-                print(f"[불통과]: {link}")
-        else:
-            print(f"[오류 발생 - .user_content 요소 없음]: {link}")
+                print(f"[오류 발생 - .user_content 요소 없음]: {link}")
 
-        # 작업이 끝난 후 iframe 밖으로 나오기
-        driver.switch_to.default_content()
+            # 작업이 끝난 후 iframe 밖으로 나오기
+            driver.switch_to.default_content()
 
-    except Exception as e:
-        print(f"[오류 발생 - iframe 처리 중 오류]: {link} - {e}")
+        except Exception as e:
+            print(f"[오류 발생 - iframe 처리 중 오류]: {link} - {e}")
 
     except Exception as e:
         print(f"[오류 발생 - 링크 접속 실패]: {link}\n{e}")
