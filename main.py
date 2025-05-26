@@ -1,20 +1,24 @@
+# 크롤링 라이브러리
 import requests
 from bs4 import BeautifulSoup
+import time
+import re
+
+import pandas as pd
+
+# 캡쳐, OCR
 import base64
 import pytesseract
-import time
 import os
+from PIL import Image
+
+# 웹 드라이버 라이브러리
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
-from PIL import Image
-import re
 
 
-
-# 잡코리아
-url = "https://www.jobkorea.co.kr/Recruit/Home/_GI_List/"
-
+# 추적 방지를 위한 헤더 설정
 headers = {
     "User-Agent": "Mozilla/5.0",
     "Referer": "https://www.jobkorea.co.kr/recruit/joblist?menucode=local",
@@ -22,13 +26,13 @@ headers = {
     "X-Requested-With": "XMLHttpRequest"
 }
 
-# 프롬프트 엔지니어 직무 코드
+# 환경디자이너 직무 코드 / POST 메서드로 요청
 payload = {
     "condition": {
         "dutyCtgr": 0,
         "duty": "1000262",
         "dutyArr": ["1000262"],
-        "dutyCtgrSelect": ["10032"],
+        "dutyCtgrSelect": ["10032"], # 디자인
         "dutySelect": ["10010002620414"],
         "isAllDutySearch": False
     },
@@ -37,49 +41,68 @@ payload = {
     "PageSize": 50
 }
 
-base_url = "https://www.jobkorea.co.kr"
+# 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
+# 잡코리아 공고 기본 url
+url = "https://www.jobkorea.co.kr/Recruit/Home/_GI_List/"
 session = requests.Session()
 session.headers.update(headers)
-
 response = session.post(url, json=payload)
 
+# 검색된 자격증 저장 리스트
+certificates = []
+
+# 요청 성공 시 html 문서 파싱
 if response.status_code == 200:
     soup = BeautifulSoup(response.text, "html.parser")
     jobs = soup.select("table .tplTit > .titBx")
 
     for job in jobs:
+
+        # 공고에서 링크 추출
         a_tag = job.select_one("a")
-        title = a_tag.text.strip() if a_tag else "제목 없음"
         href = a_tag["href"] if a_tag else None
 
-        print("🧾 채용 공고:", title)
-
         if href:
-            # 공고 ID 추출 (ex. /Recruit/GI_Read/49693541 → 49693541)
+
+            # 공고 ID 추출
             match = re.search(r'/Recruit/GI_Read/(\d+)', href)
+
+            # 각 공고 상세 페이지 요청
             if match:
                 gno = match.group(1)
                 detail_url = f"https://www.jobkorea.co.kr/Recruit/GI_Read/{gno}"
-
                 try:
                     detail_res = session.get(detail_url, timeout=10)
                     time.sleep(1.5)
 
+                    # 요청 성공 시 html 문서 파싱, 해당 요소 찾기
                     if detail_res.status_code == 200:
                         detail_soup = BeautifulSoup(detail_res.text, "html.parser")
                         dt_elements = detail_soup.select(".artReadJobSum .tbList dt")
+                        
+                        # 우대 자격증 추출 / 저장
                         for dt in dt_elements:
                             if '자격' in dt.text:
                                 dd = dt.find_next_sibling("dd")
                                 if dd:
-                                    print("   📝 자격 요건:", dd.text.strip())
+                                    print(gno + "번 공고 우대 자격증 : " + dd.text)
+                                    certificates.append({
+                                        "직무코드(대)": 10032,
+                                        "직무코드(소)": 1000262,
+                                        "gno": gno,
+                                        "자격증": dd.text
+                                    })
                     else:
-                        print("❌ 상세 페이지 응답 실패:", detail_res.status_code)
+                        print("[오류] 상세 페이지 응답 실패:", detail_res.status_code)
 
                 except Exception as e:
-                    print("❌ 상세 페이지 요청 오류:", e)
+                    print("[오류] 상세 페이지 요청 오류:", e)
             else:
-                print("⚠️ 링크에서 공고 ID 추출 실패:", href)
+                print("[오류] 링크에서 공고 ID 추출 실패:", href)
 
 else:
-    print("❌ 리스트 페이지 요청 실패:", response.status_code)
+    print("[오류] 리스트 페이지 요청 실패:", response.status_code)
+
+
+df = pd.DataFrame(certificates)
+df.to_excel("jobkorea_requirements.xlsx", index=False)
