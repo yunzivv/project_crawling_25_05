@@ -30,18 +30,21 @@ headers = {
     "X-Requested-With": "XMLHttpRequest"
 }
 
-# 기획, 전략 > 경영, 비즈니스 기획 pg.1-80
+# 기획, 전략 > 경영·비즈니스기획 4,012
+dutyCtgr = "10026" # 직무 카테코리
+duty = "1000185" # 직무
+
 payload = {
     "condition": {
         "dutyCtgr": 0,
-        "duty": "1000185",
-        "dutyArr": ["1000185"],
-        "dutyCtgrSelect": ["10026"],
-        "dutySelect": ["1000185"],
+        "duty": duty,
+        "dutyArr": [duty],
+        "dutyCtgrSelect": [dutyCtgr],
+        "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 2875,
-    "Page": 6,
+    "TotalCount": 2910,
+    "Page": 1,
     "PageSize": 500
 }
 
@@ -64,7 +67,8 @@ if response.status_code == 200:
 
         # 공고에서 링크 추출
         a_tag = job.select_one("a")
-        href = a_tag["href"] if a_tag else None
+        href = a_tag["href"] if a_tag else None  
+        gamejob = 0
 
         if href:
 
@@ -81,28 +85,44 @@ if response.status_code == 200:
 
                     # 요청 성공 시 html 문서 파싱, 해당 요소 찾기
                     if detail_res.status_code == 200:
+
                         detail_soup = BeautifulSoup(detail_res.text, "html.parser")
-                        dt_elements = detail_soup.select(".artReadJobSum .tbList dt")
-                        
+
+                        # 팝업 dt
+                        popup_pref = detail_soup.select_one(".artReadJobSum .tbList #popupPref")
+
+                        if popup_pref:
+                            dt_elements = popup_pref.select(".tbAdd dt")
+                        else:
+                            dt_elements = detail_soup.select(".artReadJobSum .tbList dt")
+
                         # 우대 자격증 추출 / 저장
                         for dt in dt_elements:
                             if '자격' in dt.text:
                                 dd = dt.find_next_sibling("dd")
                                 if dd:
-                                    print(gno + "번 공고 우대 자격증 : " + dd.text)
-                                    certificates.append({
-                                        "직무코드(대)": 10026,
-                                        "직무코드(소)": 1000185,
-                                        "gno": gno,
-                                        "자격증": dd.text,
-                                        "수집일": date.today()
-                                    })
+                                    
+                                    cert_text = dd.text.strip().rstrip(',')
+                                    cert_list = [cert.strip() for cert in cert_text.split(',') if cert.strip()] 
+
+                                    for cert in cert_list:
+                                        print(gno + "번 공고 우대 자격증 : " + cert)
+                                        certificates.append({
+                                            "직무 카테고리": dutyCtgr,
+                                            "직무 코드": duty,
+                                            "공고번호": gno,
+                                            "자격증": cert,
+                                            "수집일": date.today()
+                                        })
                     else:
                         print("[오류]"+ gno + "번 상세 페이지 응답 실패:", detail_res.status_code)
 
                 except Exception as e:
                     print("[오류]"+ gno + "번 상세 페이지 요청 오류:", e)
             else:
+                if href.str.contains("www.gamejob.co.kr"):
+                    gamejob += 1
+                    continue
                 print("[오류] 링크에서 공고 ID 추출 실패:", href)
 
 else:
@@ -122,4 +142,5 @@ else:
 
 # 저장 (덮어쓰기)
 combined_df.to_excel(file_path, index=False)
+print(f"gamejob 링크 {gamejob}개")
 print("✔ 종료")
