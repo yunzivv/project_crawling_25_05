@@ -19,6 +19,7 @@ from selenium.webdriver.chrome.service import Service
 
 # 날짜 출력
 from datetime import date
+import random
 
 
 # 추적 방지를 위한 헤더 설정
@@ -29,7 +30,7 @@ headers = {
     "X-Requested-With": "XMLHttpRequest"
 }
 
-# 기획, 전략 > 경영, 비즈니스 기획
+# 기획, 전략 > 경영, 비즈니스 기획 pg.1-80
 payload = {
     "condition": {
         "dutyCtgr": 0,
@@ -40,8 +41,8 @@ payload = {
         "isAllDutySearch": False
     },
     "TotalCount": 2875,
-    "Page": 1,
-    "PageSize": 50
+    "Page": 6,
+    "PageSize": 500
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
@@ -76,7 +77,7 @@ if response.status_code == 200:
                 detail_url = f"https://www.jobkorea.co.kr/Recruit/GI_Read/{gno}"
                 try:
                     detail_res = session.get(detail_url, timeout=10)
-                    time.sleep(1.5)
+                    time.sleep(random.uniform(1, 4))
 
                     # 요청 성공 시 html 문서 파싱, 해당 요소 찾기
                     if detail_res.status_code == 200:
@@ -97,10 +98,10 @@ if response.status_code == 200:
                                         "수집일": date.today()
                                     })
                     else:
-                        print("[오류] 상세 페이지 응답 실패:", detail_res.status_code)
+                        print("[오류]"+ gno + "번 상세 페이지 응답 실패:", detail_res.status_code)
 
                 except Exception as e:
-                    print("[오류] 상세 페이지 요청 오류:", e)
+                    print("[오류]"+ gno + "번 상세 페이지 요청 오류:", e)
             else:
                 print("[오류] 링크에서 공고 ID 추출 실패:", href)
 
@@ -121,3 +122,4 @@ else:
 
 # 저장 (덮어쓰기)
 combined_df.to_excel(file_path, index=False)
+print("✔ 종료")
