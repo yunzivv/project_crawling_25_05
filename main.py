@@ -17,6 +17,9 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 
+# 날짜 출력
+from datetime import date
+
 
 # 추적 방지를 위한 헤더 설정
 headers = {
@@ -26,17 +29,17 @@ headers = {
     "X-Requested-With": "XMLHttpRequest"
 }
 
-# 환경디자이너 직무 코드 / POST 메서드로 요청
+# 기획, 전략 > 경영, 비즈니스 기획
 payload = {
     "condition": {
         "dutyCtgr": 0,
-        "duty": "1000262",
-        "dutyArr": ["1000262"],
-        "dutyCtgrSelect": ["10032"], # 디자인
-        "dutySelect": ["10010002620414"],
+        "duty": "1000185",
+        "dutyArr": ["1000185"],
+        "dutyCtgrSelect": ["10026"],
+        "dutySelect": ["1000185"],
         "isAllDutySearch": False
     },
-    "TotalCount": 34,
+    "TotalCount": 2875,
     "Page": 1,
     "PageSize": 50
 }
@@ -87,10 +90,11 @@ if response.status_code == 200:
                                 if dd:
                                     print(gno + "번 공고 우대 자격증 : " + dd.text)
                                     certificates.append({
-                                        "직무코드(대)": 10032,
-                                        "직무코드(소)": 1000262,
+                                        "직무코드(대)": 10026,
+                                        "직무코드(소)": 1000185,
                                         "gno": gno,
-                                        "자격증": dd.text
+                                        "자격증": dd.text,
+                                        "수집일": date.today()
                                     })
                     else:
                         print("[오류] 상세 페이지 응답 실패:", detail_res.status_code)
@@ -103,6 +107,17 @@ if response.status_code == 200:
 else:
     print("[오류] 리스트 페이지 요청 실패:", response.status_code)
 
-
+# pandas 사용 -> 엑셀 파일로 저장
 df = pd.DataFrame(certificates)
-df.to_excel("jobkorea_requirements.xlsx", index=False)
+file_path = "jobkorea_requirements.xlsx"
+
+if os.path.exists(file_path):
+    # 기존 파일 읽기
+    existing_df = pd.read_excel(file_path)
+    # 기존 + 신규 데이터 결합
+    combined_df = pd.concat([existing_df, df], ignore_index=True)
+else:
+    combined_df = df
+
+# 저장 (덮어쓰기)
+combined_df.to_excel(file_path, index=False)
