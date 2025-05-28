@@ -25,7 +25,7 @@ headers = {
 
 # 기획, 전략 > 마케팅 기획 2787
 dutyCtgr = "10026" # 직무 카테코리
-duty = "1000187" # 직무
+duty = "1000188" # 직무
 
 payload = {
     "condition": {
@@ -36,7 +36,7 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 2787,
+    "TotalCount": 915,
     "Page": 1,
     "PageSize": 500
 }
