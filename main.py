@@ -23,9 +23,9 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 기획, 전략 > 경영·비즈니스기획 4,044
+# 기획, 전략 > 마케팅 기획 2787
 dutyCtgr = "10026" # 직무 카테코리
-duty = "1000185" # 직무
+duty = "1000187" # 직무
 
 payload = {
     "condition": {
@@ -36,7 +36,7 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 2903,
+    "TotalCount": 2787,
     "Page": 1,
     "PageSize": 500
 }
@@ -56,6 +56,7 @@ certificates = []
 
 # 요청 성공 시 html 문서 파싱
 if response.status_code == 200:
+    
     soup = BeautifulSoup(response.text, "lxml")
     jobs = soup.select(".devTplTabBx table .tplTit > .titBx")
 
@@ -63,9 +64,7 @@ if response.status_code == 200:
 
         # 공고에서 링크 추출
         a_tag = job.select_one("a")
-        href = a_tag["href"] if a_tag else None  
-        gamejob = 0
-
+        href = a_tag["href"] if a_tag else None 
         if href:
 
             # 공고 ID 추출
@@ -78,10 +77,8 @@ if response.status_code == 200:
                 try:
                     detail_res = session.get(detail_url, timeout=10)
                     time.sleep(random.uniform(1, 3))
-
                     # 요청 성공 시 html 문서 파싱, 해당 요소 찾기
                     if detail_res.status_code == 200:
-
                         detail_soup = BeautifulSoup(detail_res.text, "lxml")
 
                         # 팝업 dt
@@ -89,6 +86,7 @@ if response.status_code == 200:
 
                         if popup_pref:
                             dt_elements = popup_pref.select(".tbAdd dt")
+
                         else:
                             dt_elements = detail_soup.select(".artReadJobSum .tbList dt")
 
@@ -116,8 +114,7 @@ if response.status_code == 200:
                 except Exception as e:
                     print("[오류]"+ gno + "번 상세 페이지 요청 오류:", e)
             else:
-                if href.str.contains("www.gamejob.co.kr"):
-                    gamejob += 1
+                if "www.gamejob.co.kr" in href:
                     continue
                 print("[오류] 링크에서 공고 ID 추출 실패:", href)
 
@@ -138,5 +135,4 @@ else:
 
 # 저장 (덮어쓰기)
 combined_df.to_excel(file_path, index=False)
-print(f"gamejob 링크 {gamejob}개")
 print("✔ 종료")
