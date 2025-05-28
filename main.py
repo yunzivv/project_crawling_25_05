@@ -23,9 +23,9 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 기획, 전략 > 마케팅 기획 2787
+# 인사 · HR > 인사 담당자 2,335
 dutyCtgr = "10026" # 직무 카테코리
-duty = "1000188" # 직무
+duty = "1000201" # 직무
 
 payload = {
     "condition": {
@@ -36,10 +36,11 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 915,
-    "Page": 1,
+    "TotalCount": 1965,
+    "Page": 2,
     "PageSize": 500
 }
+
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
 # 잡코리아 공고 기본 url
