@@ -7,15 +7,7 @@ import re
 import pandas as pd
 
 # 캡쳐, OCR
-import base64
-import pytesseract
 import os
-from PIL import Image
-
-# 웹 드라이버 라이브러리
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
 
 # 날짜 출력
 from datetime import date
@@ -25,12 +17,13 @@ import random
 # 추적 방지를 위한 헤더 설정
 headers = {
     "User-Agent": "Mozilla/5.0",
-    "Referer": "https://www.jobkorea.co.kr/recruit/joblist?menucode=local",
+    "Referer": "https://www.jobkorea.co.kr/recruit/joblist?menucode=duty",
     "Content-Type": "application/json",
-    "X-Requested-With": "XMLHttpRequest"
+    "X-Requested-With": "XMLHttpRequest",
+    "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 기획, 전략 > 경영·비즈니스기획 4,012
+# 기획, 전략 > 경영·비즈니스기획 4,044
 dutyCtgr = "10026" # 직무 카테코리
 duty = "1000185" # 직무
 
@@ -43,7 +36,7 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 2910,
+    "TotalCount": 2903,
     "Page": 1,
     "PageSize": 500
 }
@@ -51,7 +44,10 @@ payload = {
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
 # 잡코리아 공고 기본 url
 url = "https://www.jobkorea.co.kr/Recruit/Home/_GI_List/"
+
+# 쿠키
 session = requests.Session()
+session.get("https://www.jobkorea.co.kr/")
 session.headers.update(headers)
 response = session.post(url, json=payload)
 
@@ -60,8 +56,8 @@ certificates = []
 
 # 요청 성공 시 html 문서 파싱
 if response.status_code == 200:
-    soup = BeautifulSoup(response.text, "html.parser")
-    jobs = soup.select("table .tplTit > .titBx")
+    soup = BeautifulSoup(response.text, "lxml")
+    jobs = soup.select(".devTplTabBx table .tplTit > .titBx")
 
     for job in jobs:
 
@@ -81,15 +77,15 @@ if response.status_code == 200:
                 detail_url = f"https://www.jobkorea.co.kr/Recruit/GI_Read/{gno}"
                 try:
                     detail_res = session.get(detail_url, timeout=10)
-                    time.sleep(random.uniform(1, 4))
+                    time.sleep(random.uniform(1, 3))
 
                     # 요청 성공 시 html 문서 파싱, 해당 요소 찾기
                     if detail_res.status_code == 200:
 
-                        detail_soup = BeautifulSoup(detail_res.text, "html.parser")
+                        detail_soup = BeautifulSoup(detail_res.text, "lxml")
 
                         # 팝업 dt
-                        popup_pref = detail_soup.select_one(".artReadJobSum .tbList #popupPref")
+                        popup_pref = detail_soup.select_one("#popupPref")
 
                         if popup_pref:
                             dt_elements = popup_pref.select(".tbAdd dt")

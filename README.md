@@ -6,6 +6,7 @@
 - requests
 - BeautifulSoup
 - Selenium
+- pandas
 
 ## 목표
 1. 크롤링 연습
