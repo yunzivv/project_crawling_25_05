@@ -24,8 +24,8 @@ headers = {
 }
 
 # 인사 · HR > 인사 담당자 2,335
-dutyCtgr = "10026" # 직무 카테코리
-duty = "1000201" # 직무
+dutyCtgr = "10030" # 직무 카테코리
+duty = "1000217" # 직무
 
 payload = {
     "condition": {
@@ -36,11 +36,10 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 1965,
-    "Page": 2,
+    "TotalCount": 1846,
+    "Page": 4,
     "PageSize": 500
 }
-
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
 # 잡코리아 공고 기본 url
@@ -57,7 +56,6 @@ certificates = []
 
 # 요청 성공 시 html 문서 파싱
 if response.status_code == 200:
-    
     soup = BeautifulSoup(response.text, "lxml")
     jobs = soup.select(".devTplTabBx table .tplTit > .titBx")
 
@@ -107,7 +105,7 @@ if response.status_code == 200:
                                             "직무 코드": duty,
                                             "공고번호": gno,
                                             "자격증": cert,
-                                            "수집일": date.today()
+                                            "수집일": time.strftime('%Y.%m.%d - %H:%M:%S')
                                         })
                     else:
                         print("[오류]"+ gno + "번 상세 페이지 응답 실패:", detail_res.status_code)
@@ -115,7 +113,7 @@ if response.status_code == 200:
                 except Exception as e:
                     print("[오류]"+ gno + "번 상세 페이지 요청 오류:", e)
             else:
-                if "www.gamejob.co.kr" in href:
+                if "www.gamejob.co.kr" in href or "www.albamon.com" in href:
                     continue
                 print("[오류] 링크에서 공고 ID 추출 실패:", href)
 
@@ -136,4 +134,5 @@ else:
 
 # 저장 (덮어쓰기)
 combined_df.to_excel(file_path, index=False)
+
 print("✔ 종료")
