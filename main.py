@@ -13,7 +13,6 @@ import os
 from datetime import date
 import random
 
-
 # 추적 방지를 위한 헤더 설정
 headers = {
     "User-Agent": "Mozilla/5.0",
@@ -37,7 +36,7 @@ payload = {
         "isAllDutySearch": False
     },
     "TotalCount": 4439,
-    "Page": 4,
+    "Page": 10,
     "PageSize": 444
 }
 
