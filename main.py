@@ -22,9 +22,9 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 마케팅 · 광고 · MD > 콘텐츠마케터 2192
+# 마케팅 · 광고 · MD > 홍보 1,806
 dutyCtgr = "10030" # 직무 카테코리
-duty = "1000221" # 직무
+duty = "1000222" # 직무
 
 payload = {
     "condition": {
@@ -35,9 +35,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 2192,
+    "TotalCount": 1806,
     "Page": 4,
-    "PageSize": 550
+    "PageSize": 500
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
