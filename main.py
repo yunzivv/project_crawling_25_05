@@ -22,9 +22,9 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 디자인 > 	그래픽 디자이너 1364
+# 디자인 > 	3D 디자이너 599
 dutyCtgr = "10032" # 직무 카테코리
-duty = "1000248" # 직무
+duty = "1000249" # 직무
 
 payload = {
     "condition": {
@@ -35,9 +35,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 1364,
-    "Page": 10,
-    "PageSize": 137
+    "TotalCount": 599,
+    "Page": 2,
+    "PageSize": 300
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
