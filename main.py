@@ -22,9 +22,9 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 고객상담 · TM > 인바운드상담원 완료 7182
+# 고객상담 · TM > 아웃바운드상담원 완료 4250
 dutyCtgr = "10036"
-duty = "1000286"
+duty = "1000287"
 
 payload = {
     "condition": {
@@ -35,9 +35,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 7182,
-    "Page": 7,
-    "PageSize": 500
+    "TotalCount": 4250,
+    "Page": 10,
+    "PageSize": 200
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
