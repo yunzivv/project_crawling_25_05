@@ -24,7 +24,7 @@ headers = {
 
 # 운전 · 운송 · 배송 > 화물 · 중장비기사 1,384
 dutyCtgr = "10034"
-duty = "1000273"
+duty = "1000274"
 
 payload = {
     "condition": {
@@ -35,9 +35,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 1384,
-    "Page": 4,
-    "PageSize": 350
+    "TotalCount": 146,
+    "Page": 1,
+    "PageSize": 146
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
