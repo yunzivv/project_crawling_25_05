@@ -22,9 +22,9 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 고객상담 · TM > 아웃바운드상담원 완료 4250
+# 고객상담 · TM > 고객센터관리자 완료 1286
 dutyCtgr = "10036"
-duty = "1000287"
+duty = "1000288"
 
 payload = {
     "condition": {
@@ -35,9 +35,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 4250,
-    "Page": 10,
-    "PageSize": 200
+    "TotalCount": 1286,
+    "Page": 4,
+    "PageSize": 400
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
@@ -104,7 +104,8 @@ if response.status_code == 200:
                                             "직무 코드": duty,
                                             "공고번호": gno,
                                             "자격증": cert,
-                                            "수집일": time.strftime('%Y.%m.%d - %H:%M:%S')
+                                            "수집일": time.strftime('%Y.%m.%d - %H:%M:%S'),
+                                            "source": 'jobkorea'
                                         })
                     else:
                         print("[오류]"+ gno + "번 상세 페이지 응답 실패:", detail_res.status_code)
