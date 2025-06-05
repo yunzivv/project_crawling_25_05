@@ -2,6 +2,7 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from datetime import datetime
 
+# ocr-env_db
 # 엑셀 파일 읽기
 df = pd.read_excel('national_cert.xlsx') 
 print(df.columns)

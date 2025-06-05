@@ -13,6 +13,8 @@ import os
 from datetime import date
 import random
 
+# ocr-env
+
 # 추적 방지를 위한 헤더 설정
 headers = {
     "User-Agent": "Mozilla/5.0",
@@ -24,7 +26,7 @@ headers = {
 
 # 식 · 음료 > 요리사 완료 3,625
 dutyCtgr = "10038"
-duty = "1000297"
+duty = "1000298"
 
 payload = {
     "condition": {
@@ -35,9 +37,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 6317,
-    "Page": 5,
-    "PageSize": 300
+    "TotalCount": 2773,
+    "Page": 10,
+    "PageSize": 280
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
