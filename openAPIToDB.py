@@ -3,6 +3,8 @@ import xmltodict
 import pandas as pd
 import os
 
+
+# ocr-env_api
 # ▶️ API 기본 정보
 url = "http://openapi.q-net.or.kr/api/service/rest/InquiryQualInfo/getList"
 params = {

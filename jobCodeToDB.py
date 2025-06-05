@@ -1,33 +1,35 @@
 import pandas as pd
-import re
+from sqlalchemy import create_engine, text
+from datetime import datetime
 
-# 엑셀 불러오기
-df = pd.read_excel("qnet_certifications.xlsx")
+# 엑셀 파일 읽기
+df = pd.read_excel('national_cert.xlsx') 
+print(df.columns)
 
-# 등급 우선순위
-priority = {"기술사": 1, "기능장": 2, "기사": 3, "산업기사": 4, "기능사": 5}
+# DB 연결
+db_url = "mysql+pymysql://root@localhost:3306/project_25_05"
+engine = create_engine(db_url)
 
-# 정확한 등급 추출 함수
-def extract_grade(name):
-    for grade in priority:
-        if isinstance(name, str) and re.search(f'{grade}$', name):
-            return grade
-    return None
+# 필수 컬럼만 추출 (id, name, certGrade, isNational, agency, parentId)
+df_filtered = df[['id', 'name', 'certGrade', 'isNational', 'agency', 'parentId']].dropna(subset=['id', 'name'])
 
-# 자격증군 추출 (등급 제거한 앞부분)
-def extract_group(name):
-    grade = extract_grade(name)
-    if grade and isinstance(name, str):
-        return name.replace(grade, '')
-    return name
+# 현재 시간 (regDate, updateDate용)
+now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-# 적용
-df['seriesNm'] = df['자격증명'].apply(extract_grade)
-df['자격증군'] = df['자격증명'].apply(extract_group)
-df['등급순위'] = df['seriesNm'].map(priority)
+with engine.connect() as conn:
+    for _, row in df_filtered.iterrows():
+        stmt = text("""
+            INSERT INTO certificate (id, name, certGrade, isNational, agency, parentId, regDate, updateDate)
+            VALUES (:id, :name, :certGrade, :isNational, :agency, :parentId, NOW(), NOW())
+        """)
+        conn.execute(stmt, {
+            "id": int(row["id"]),
+            "name": row["name"],
+            "certGrade": int(row["certGrade"]) if not pd.isna(row["certGrade"]) else None,
+            "isNational": int(row["isNational"]) if not pd.isna(row["isNational"]) else None,
+            "agency": row["agency"] if not pd.isna(row["agency"]) else None,
+            "parentId": int(row["parentId"]) if not pd.isna(row["parentId"]) else None,
+        })
+    conn.commit()
 
-# 정렬
-df_sorted = df.sort_values(by=['자격증군', '등급순위'])
-
-# 저장
-df_sorted.to_excel("자격증_정렬완료.xlsx", index=False)
+print("데이터베이스에 저장 완료!")
