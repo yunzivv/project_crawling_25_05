@@ -24,7 +24,7 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 식 · 음료 > 요리사 완료 3,625
+# 식 · 음료 > 조리사 완료 3,625
 dutyCtgr = "10038"
 duty = "1000298"
 
@@ -38,7 +38,7 @@ payload = {
         "isAllDutySearch": False
     },
     "TotalCount": 2773,
-    "Page": 11,
+    "Page": 12,
     "PageSize": 280
 }
 
