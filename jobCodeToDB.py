@@ -3,7 +3,7 @@
 
 # # ocr-env_db
 # # 1. 엑셀 파일 읽기
-# df = pd.read_excel('매핑완료.xlsx')
+# df = pd.read_excel('매핑완료_4916.xlsx')
 
 # # 2. certId가 null인 행 제외
 # df_filtered = df[df['certId'].notnull()].copy()
@@ -27,17 +27,18 @@
 #     for _, row in df_filtered.iterrows():
 #         stmt = text("""
 #             INSERT INTO certMention (
-#                 jobCatId, jobCodeId, certId, gno, source, regDate, updateDate
+#                 id, jobCatId, jobCodeId, certId, gno, source, regDate, updateDate
 #             ) VALUES (
-#                 :jobCatId, :jobCodeId, :certId, :gno, :source, :regDate, :updateDate
+#                 :id, :jobCatId, :jobCodeId, :certId, :gno, :source, :regDate, :updateDate
 #             )
 #         """)
 #         conn.execute(stmt, {
+#             "id": row["id"],
 #             "jobCatId": row["jobCatId"],
 #             "jobCodeId": row["jobCodeId"],
 #             "certId": row["certId"],
 #             "gno": row["gno"],
-#             "source": row.get("source", "jobkorea"),  # 없으면 기본값
+#             "source": row.get("source", "jobkorea"),
 #             "regDate": row["regDate"],
 #             "updateDate": row["updateDate"]
 #         })
@@ -51,7 +52,7 @@ from datetime import datetime
 
 # ocr-env_db
 # 엑셀 파일 읽기
-df = pd.read_excel('national_cert.xlsx') 
+df = pd.read_excel('certList.xlsx') 
 print(df.columns)
 
 # DB 연결
@@ -59,10 +60,10 @@ db_url = "mysql+pymysql://root@localhost:3306/project_25_05"
 engine = create_engine(db_url)
 
 # 필수 컬럼만 추출 (id, name, certGrade, isNational, agency, parentId)
-df_filtered = df[['id', 'name', 'certGrade', 'isNational', 'agency', 'parentId']].dropna(subset=['id', 'name'])
+df_filtered = df[['id', 'name', 'certGrade', 'isNational', 'agency', 'parentId', 'href']].dropna(subset=['id', 'name'])
 
 # ✅ ID가 884보다 큰 데이터만 필터링
-df_filtered = df_filtered[df_filtered['id'] > 884]
+# df_filtered = df_filtered[df_filtered['id'] > 884]
 
 # 현재 시간 (regDate, updateDate용)
 now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -77,12 +78,12 @@ with engine.connect() as conn:
 
         if result > 0:
             print(f"⚠️ 중복된 ID {row_id} 건너뜀")
-            continue  # 이미 있는 ID면 insert 건너뜀
+            continue 
 
         # ✅ 데이터 삽입
         stmt = text("""
-            INSERT INTO certificate (id, name, certGrade, isNational, agency, parentId, regDate, updateDate)
-            VALUES (:id, :name, :certGrade, :isNational, :agency, :parentId, NOW(), NOW())
+            INSERT INTO certificate (id, name, certGrade, isNational, agency, parentId, href, regDate, updateDate)
+            VALUES (:id, :name, :certGrade, :isNational, :agency, :href, :parentId, NOW(), NOW())
         """)
         conn.execute(stmt, {
             "id": row_id,
@@ -91,6 +92,7 @@ with engine.connect() as conn:
             "isNational": int(row["isNational"]) if not pd.isna(row["isNational"]) else None,
             "agency": row["agency"] if not pd.isna(row["agency"]) else None,
             "parentId": int(row["parentId"]) if not pd.isna(row["parentId"]) else None,
+            "href": row["href"] if not pd.isna(row["href"]) else None
         })
 
     conn.commit()

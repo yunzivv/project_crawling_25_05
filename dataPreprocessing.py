@@ -3,7 +3,7 @@ import pandas as pd
 # ocr-env_preprocess
 # 데이터 불러오기
 df_target = pd.read_excel("1차 가공_4916.xlsx")   # certName 포함
-df_cert = pd.read_excel("national_cert.xlsx")           # name + id 포함
+df_cert = pd.read_excel("certList.xlsx")           # name + id 포함
 
 # 2. certName 공백 제거
 df_target['certName_clean'] = df_target['certName'].str.replace(r'\s+', '', regex=True)
@@ -24,4 +24,4 @@ df_target.drop(columns=['certName_clean'], inplace=True)
 
 # 결과 저장
 print("매핑 완료")
-df_target.to_excel("매핑완료.xlsx", index=False)
+df_target.to_excel("매핑완료_4916.xlsx", index=False)
