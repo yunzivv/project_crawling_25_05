@@ -2,7 +2,7 @@ import pandas as pd
 
 # ocr-env_preprocess
 # 데이터 불러오기
-df_target = pd.read_excel("1차 가공.xlsx")   # certName 포함
+df_target = pd.read_excel("1차 가공_4916.xlsx")   # certName 포함
 df_cert = pd.read_excel("national_cert.xlsx")           # name + id 포함
 
 # 2. certName 공백 제거
