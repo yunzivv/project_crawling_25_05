@@ -26,7 +26,7 @@ headers = {
 
 # 식 · 음료 > 소믈리에 · 바텐터 완료 2432
 dutyCtgr = "10038"
-duty = "100030"
+duty = "1000305"
 
 payload = {
     "condition": {
