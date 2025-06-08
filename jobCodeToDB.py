@@ -76,7 +76,7 @@ with engine.connect() as conn:
         result = conn.execute(check_stmt, {"id": row_id}).scalar()
 
         if result > 0:
-            print(f"⚠️ 중복된 ID {row_id} → 건너뜀")
+            print(f"⚠️ 중복된 ID {row_id} 건너뜀")
             continue  # 이미 있는 ID면 insert 건너뜀
 
         # ✅ 데이터 삽입
@@ -96,4 +96,4 @@ with engine.connect() as conn:
     conn.commit()
 
 
-print("데이터베이스에 저장 완료!")
+print("데이터베이스에 저장 완료")
