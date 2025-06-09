@@ -26,7 +26,7 @@ headers = {
 
 # 엔지니어링 · 설계 > 기계엔지니어 완료 1608
 dutyCtgr = "10040"
-duty = "1000327"
+duty = "1000328"
 
 payload = {
     "condition": {
@@ -37,9 +37,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 1870,
-    "Page": 10,
-    "PageSize": 187
+    "TotalCount": 2462,
+    "Page": 3,
+    "PageSize": 247
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
