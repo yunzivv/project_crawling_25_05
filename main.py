@@ -24,9 +24,9 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 엔지니어링 · 설계 > RF엔지니어 완료 71
+# 엔지니어링 · 설계 > 필드엔지니어 완료 582
 dutyCtgr = "10040"
-duty = "1000335"
+duty = "1000336"
 
 payload = {
     "condition": {
@@ -37,9 +37,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 71,
-    "Page": 1,
-    "PageSize": 71
+    "TotalCount": 582,
+    "Page": 2,
+    "PageSize": 290
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
