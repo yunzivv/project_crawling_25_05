@@ -24,7 +24,7 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 엔지니어링 · 설계 > 기계엔지니어 완료 1608
+# 엔지니어링 · 설계 > 설계엔지니어 완료 2462
 dutyCtgr = "10040"
 duty = "1000328"
 
@@ -38,7 +38,7 @@ payload = {
         "isAllDutySearch": False
     },
     "TotalCount": 2462,
-    "Page": 3,
+    "Page": 10,
     "PageSize": 247
 }
 
