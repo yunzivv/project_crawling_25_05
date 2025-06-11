@@ -13,7 +13,7 @@ import os
 from datetime import date
 import random
 
-# ocr-env
+# ocr-env\Scripts\activate
 
 # 추적 방지를 위한 헤더 설정
 headers = {
@@ -26,7 +26,7 @@ headers = {
 
 # 교육 > 교재개발·교수설계 완료 624
 dutyCtgr = "10042"
-duty = "1000353"
+duty = "1000425"
 
 payload = {
     "condition": { 
@@ -37,9 +37,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 624,
-    "Page": 2,
-    "PageSize": 320
+    "TotalCount": 32,
+    "Page": 1,
+    "PageSize": 32
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
