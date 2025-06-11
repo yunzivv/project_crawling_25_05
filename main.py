@@ -24,9 +24,9 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 교육 > 기술 · 전문강사 완료 1395
+# 교육 > 학습지 · 방문교사 완료 645
 dutyCtgr = "10042"
-duty = "1000349"
+duty = "1000350"
 
 payload = {
     "condition": { 
@@ -37,9 +37,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 842,
+    "TotalCount": 645,
     "Page": 2,
-    "PageSize": 450
+    "PageSize": 325
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
