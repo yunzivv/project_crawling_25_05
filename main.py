@@ -26,7 +26,7 @@ headers = {
 
 # 교육 > 학원상담·운영 완료 1462
 dutyCtgr = "10042"
-duty = "1000351"
+duty = "1000352"
 
 payload = {
     "condition": { 
@@ -37,9 +37,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 1462,
-    "Page": 4,
-    "PageSize": 370
+    "TotalCount": 827,
+    "Page": 2,
+    "PageSize": 415
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
