@@ -24,7 +24,7 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 의료·바이오 > 약사·한약사 완료 761
+# 의료·바이오 > 의료기사 완료 761
 dutyCtgr = "10044"
 duty = "1000377"
 
