@@ -24,7 +24,7 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 공공·복지 > 사회복지사 완료 4504
+# 공공·복지 > 요양보호사 완료 135
 dutyCtgr = "10046"
 duty = "1000408"
 
