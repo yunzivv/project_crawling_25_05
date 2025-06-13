@@ -3,6 +3,9 @@ from bs4 import BeautifulSoup
 import pandas as pd
 from openpyxl import load_workbook
 import time
+import os
+import re
+import requests
 
 # ocr-env_exam\Scripts\activate
 # python exam_crawling.py
@@ -45,28 +48,23 @@ import time
 
 # 게시판에서 hwp 다운로드
 
-import os
-import re
-import requests
-from bs4 import BeautifulSoup
-
 BASE_URL = "https://www.comcbt.com"
-BOARD_URL = "https://www.comcbt.com/xe/df"
 SAVE_DIR = "hwp_files"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
-def get_post_links():
-    res = requests.get(BOARD_URL)
+def get_post_links(board_url):
+    try:
+        res = requests.get(board_url)
+        res.raise_for_status()
+    except Exception as e:
+        print(f"게시판 페이지 요청 실패: {board_url} - {e}")
+        return []
+    
     soup = BeautifulSoup(res.text, 'html.parser')
     posts = []
-    links = soup.select('td.title a[href]')
-    print(f"게시글 링크 개수: {len(links)}")
-
     for a in soup.select('td.title a[href]'):
-        
         title = a.get_text(strip=True)
-        print(f"발견된 제목: {title}")
-
+        
         # (복원중) 포함 시 건너뛰기
         if '(복원중)' in title:
             print(f"⏭️ 건너뜀 (복원중): {title}")
@@ -82,7 +80,7 @@ def get_post_links():
         else:
             print(f"⏭️ 건너뜀 (연도없음): {title}")
             continue
-
+        
         href = a['href']
         full_url = requests.compat.urljoin(BASE_URL, href)
         posts.append((title, full_url))
@@ -90,35 +88,59 @@ def get_post_links():
 
 def download_hwp_from_post(title, post_url):
     print(f"➡️ 게시글 접속: {title} - {post_url}")
-    res = requests.get(post_url)
+    try:
+        res = requests.get(post_url)
+        res.raise_for_status()
+    except Exception as e:
+        print(f"게시글 페이지 요청 실패: {post_url} - {e}")
+        return
+    
     soup = BeautifulSoup(res.text, 'html.parser')
-
     links = soup.find_all('a')
-    print(f"  전체 링크 개수: {len(links)}")
 
     hwp_links = []
     for link in links:
         link_text = link.get_text(strip=True)
         if link_text.endswith('.hwp') and '(교사용)' in link_text:
-            hwp_links.append((link_text, link.get('href')))
-
-    print(f"  조건에 맞는 링크 개수: {len(hwp_links)}")
+            href = link.get('href')
+            if href:
+                hwp_links.append((link_text, href))
 
     if not hwp_links:
-        print("  ⚠️ 조건에 맞는 '(교사용).hwp' 링크 없음")
+        print("  ⚠️ '(교사용).hwp' 링크 없음")
         return
 
-    # 첫 번째 링크만 다운로드
     link_text, href = hwp_links[0]
-    file_url = href  # href는 이미 절대 URL임
-    file_name = file_url.split('file_srl=')[-1] + '.hwp'  # 혹은 link_text 그대로 써도 됨
-    save_path = os.path.join(SAVE_DIR, file_name)
+    file_url = requests.compat.urljoin(BASE_URL, href)
+    # () 앞까지 잘라서 파일명 생성
+    filename = link_text.split('(')[0].strip() + '.hwp'
+    save_path = os.path.join(SAVE_DIR, filename)
 
-    print(f"📥 다운로드 중: {link_text} - 파일명: {file_name}")
-    file_content = requests.get(file_url).content
-    with open(save_path, 'wb') as f:
-        f.write(file_content)
+    if os.path.exists(save_path):
+        print(f"  이미 존재하는 파일: {filename} (다운로드 건너뜀)")
+        return
 
-posts = get_post_links()
-for title, post_url in posts:
-    download_hwp_from_post(title, post_url)
+    print(f"📥 다운로드 중: {link_text} - 파일명: {filename}")
+    try:
+        file_content = requests.get(file_url).content
+        with open(save_path, 'wb') as f:
+            f.write(file_content)
+    except Exception as e:
+        print(f"  다운로드 실패: {file_url} - {e}")
+
+def main():
+    # 엑셀에서 게시판 URL 리스트 읽기
+    df = pd.read_excel('exam_board.xlsx')
+    board_urls = df['href'].tolist()
+
+    for board_url in board_urls:
+        full_board_url = requests.compat.urljoin(BASE_URL, board_url)
+        print(f"\n▶ 게시판 접속: {full_board_url}")
+        posts = get_post_links(full_board_url)
+        print(f"게시글 개수: {len(posts)}")
+
+        for title, post_url in posts:
+            download_hwp_from_post(title, post_url)
+
+if __name__ == '__main__':
+    main()
