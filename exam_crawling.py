@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 from openpyxl import load_workbook
+import time
 
 # ocr-env_exam\Scripts\activate
 # python exam_crawling.py
@@ -12,7 +13,7 @@ response = requests.get(url)
 soup = BeautifulSoup(response.text, 'html.parser')
 
 # CSS 선택자에 맞는 링크들 추출
-links = soup.select('#gnb > ul > li:nth-child(2) > ul > li:nth-child(4) > ul li > a')
+links = soup.select('#gnb > ul > li:nth-child(2) > ul > li:nth-child(6) > ul li > a')
 
 # 딕셔너리 형태로 파싱
 data = []
@@ -20,7 +21,11 @@ for link in links:
     title = link.get_text(strip=True)
     href = link.get('href')
     full_url = requests.compat.urljoin(url, href)  # 상대 경로 보완
-    data.append({'자격증명': title, '필기 기출 링크': full_url, '종류': '필기'})
+    data.append({'자격등급': '산업기사', 
+                 '자격증명': title, 
+                 'href': full_url, 
+                 '종류': '필기', 
+                 'regDate': time.strftime('%Y.%m.%d - %H:%M:%S')})
 
 file_path = 'exam.xlsx'
 
