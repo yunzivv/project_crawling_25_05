@@ -38,7 +38,7 @@ payload = {
         "isAllDutySearch": False
     },
     "TotalCount": 16473,
-    "Page": 16,
+    "Page": 17,
     "PageSize": 300
 }
 
@@ -122,7 +122,7 @@ if response.status_code == 200:
 else:
     print("[오류] 리스트 페이지 요청 실패:", response.status_code)
 
-# pandas 사용 -> 엑셀 파일로 저장
+# 엑셀 파일로 저장
 df = pd.DataFrame(certificates)
 file_path = "jobkorea_requirements.xlsx"
 
