@@ -26,7 +26,7 @@ headers = {
 
 # 의료·바이오 > 기타의료종사자 완료 16473
 dutyCtgr = "10044"
-duty = "1000382"
+duty = "1000383"
 
 payload = {
     "condition": { 
@@ -37,9 +37,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 16473,
-    "Page": 20,
-    "PageSize": 300
+    "TotalCount": 161,
+    "Page": 1,
+    "PageSize": 161
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
