@@ -24,9 +24,9 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 의료·바이오 > 바이오 · 제약연구원 완료 1129
-dutyCtgr = "10044"
-duty = "1000384"
+# 의료·바이오 > 임상연구원 완료 90
+dutyCtgr = "10046"
+duty = "1000407"
 
 payload = {
     "condition": { 
@@ -37,9 +37,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 1129,
-    "Page": 3,
-    "PageSize": 400
+    "TotalCount": 4504,
+    "Page": 1,
+    "PageSize": 451
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
