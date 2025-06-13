@@ -7,6 +7,8 @@
 - BeautifulSoup
 - Selenium
 - pandas
+- openpyxl
+- xlml
 
 ## 목표
 1. 크롤링 연습

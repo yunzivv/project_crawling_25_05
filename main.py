@@ -38,8 +38,8 @@ payload = {
         "isAllDutySearch": False
     },
     "TotalCount": 16473,
-    "Page": 29,
-    "PageSize": 100
+    "Page": 16,
+    "PageSize": 300
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
