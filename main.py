@@ -24,9 +24,9 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 공공·복지 > 사서 완료 26
+# 공공·복지 > 자원봉사자 완료 6
 dutyCtgr = "10046"
-duty = "1000411"
+duty = "1000412"
 
 payload = {
     "condition": { 
@@ -37,7 +37,7 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 26,
+    "TotalCount": 6,
     "Page": 1,
     "PageSize": 112
 }
