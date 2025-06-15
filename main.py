@@ -24,9 +24,9 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 법무·사무·총무 > 변호사 완료 118
+# 법무·사무·총무 > 법무사 완료 118
 dutyCtgr = "10027"
-duty = "1000197"
+duty = "1000198"
 
 payload = {
     "condition": {
@@ -37,9 +37,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 118,
+    "TotalCount": 40,
     "Page": 1,
-    "PageSize": 118
+    "PageSize": 40
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
