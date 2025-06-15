@@ -38,7 +38,7 @@ payload = {
         "isAllDutySearch": False
     },
     "TotalCount": 4954,
-    "Page": 1,
+    "Page": 2,
     "PageSize": 200
 }
 
@@ -100,7 +100,7 @@ if response.status_code == 200:
                                     cert_list = [cert.strip() for cert in cert_text.split(',') if cert.strip()] 
 
                                     for cert in cert_list:
-                                        print(gno + "번 공고 우대 자격증 : " + cert)
+                                        print(gno + " 자격증: " + cert)
                                         certificates.append({
                                             "직무 카테고리": dutyCtgr,
                                             "직무 코드": duty,
