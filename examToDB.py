@@ -1,116 +1,143 @@
 import fitz  # PyMuPDF
-import re, os, datetime
-from pathlib import Path
+import re
+import pytesseract
+from PIL import Image
+import io
+import cv2
+import numpy as np
 from collections import defaultdict
 
 # ocr-env_examToDB\Scripts\activate
 
-# 파일 경로 설정
+pytesseract.pytesseract.tesseract_cmd = r'D:\yunzi\Tesseract-OCR\tesseract.exe'
 PDF_PATH = "가스기사20200606.pdf"
-IMG_DIR = "images"
 
-# 정규표현식 정의
 subject_re = re.compile(r'(\d+)\s*과목\s*[:\-]?\s*(.+)')
 question_re = re.compile(r'^(\d{1,3})\.\s*(.*)')
 choice_re = re.compile(r'([①②③④❶❷❸❹])\s*([^①②③④❶❷❸❹]+)')
+label_map = {"①": 1, "②": 2, "③": 3, "④": 4, "❶": 1, "❷": 2, "❸": 3, "❹": 4}
 
-# 보기를 숫자로 매핑
-label_map = {
-    "①": 1, "②": 2, "③": 3, "④": 4,
-    "❶": 1, "❷": 2, "❸": 3, "❹": 4
-}
-
-# 정답지 (페이지 마지막에 수작업으로 추출했음)
-answer_keys = [
-    2, 3, 3, 3, 1, 1, 1, 1, 2, 4,
-    2, 2, 1, 4, 1, 4, 3, 4, 3, 1,
-    2, 3, 2, 2, 4, 1, 1, 4, 1, 4,
-    1, 2, 3, 2, 4, 2, 3, 2, 3, 3,
-    2, 2, 1, 3, 1, 2, 2, 1, 4, 3,
-    1, 4, 1, 4, 2, 2, 1, 4, 4, 3,
-    2, 2, 1, 3, 4, 1, 1, 2, 2, 2,
-    1, 4, 3, 1, 1, 3, 3, 2, 3, 1,
-    2, 2, 2, 3, 3, 1, 4, 3, 4, 4,
-    1, 2, 2, 3, 3, 1, 4, 3, 1, 1
+answer_keys = [  # 문제 번호 순서
+    2, 3, 3, 3, 1, 1, 1, 1, 2, 4, 2, 2, 1, 4, 1, 4, 3, 4, 3, 3,
+    2, 3, 2, 2, 4, 1, 1, 4, 1, 4, 1, 2, 3, 2, 4, 2, 3, 2, 3, 3,
+    2, 2, 1, 3, 1, 2, 2, 1, 4, 3, 1, 4, 1, 4, 2, 2, 1, 4, 4, 3,
+    2, 2, 1, 3, 4, 1, 1, 2, 2, 2, 1, 4, 3, 1, 1, 3, 3, 2, 3, 1,
+    2, 2, 2, 3, 3, 1, 4, 3, 1, 1, 2, 2, 2, 3, 3, 1, 4, 3, 1, 1
 ]
 
-# 인증 정보
-cert_name = "가스기사"
-exam_date = "2020-06-06"
-
-# 결과 저장용
 questions = []
-current_subject = "알 수 없음"
 current_question = None
+current_subject = "알 수 없음"
+seen_question_numbers = set()
+ocr_needed = []
 
-# PDF 열기
 doc = fitz.open(PDF_PATH)
 
-# 1. 텍스트 추출 및 파싱
-for page in doc:
+for page_index, page in enumerate(doc):
     lines = page.get_text("text").splitlines()
     for line in lines:
         line = line.strip()
         if not line:
             continue
 
-        # 과목 감지
-        subj_match = subject_re.match(line)
-        if subj_match:
-            current_subject = subj_match.group(2).strip()
-            continue
+        if "과목" in line:
+            subj_match = subject_re.search(line)
+            if subj_match:
+                current_subject = subj_match.group(2).strip()
+                continue
 
-        # 문제 감지
         q_match = question_re.match(line)
         if q_match:
-            # 기존 문제 저장
+            q_num = int(q_match.group(1))
+            if q_num in seen_question_numbers:
+                continue
+            seen_question_numbers.add(q_num)
+
             if current_question:
                 questions.append(current_question)
-            elif current_question and not choice_re.search(line) and not question_re.match(line):
-                # 문제 본문 계속 이어붙이기
-                current_question["body"] += " " + line.strip()    
 
             current_question = {
-                "number": int(q_match.group(1)),
+                "number": q_num,
                 "body": q_match.group(2).strip(),
                 "subject": current_subject,
-                "choices": []
+                "choices": [],
+                "page": page_index
             }
             continue
 
-        # 보기 감지 (여러 개일 수 있음)
         if current_question:
             for c_match in choice_re.finditer(line):
-                label_str = c_match.group(1)
-                label_num = label_map.get(label_str)
+                label = label_map.get(c_match.group(1))
                 body = c_match.group(2).strip()
-
                 current_question["choices"].append({
-                    "label": label_num,
+                    "label": label,
                     "body": body
                 })
 
-# 마지막 문제 저장
+        if current_question and not question_re.match(line) and not choice_re.search(line):
+            current_question["body"] += " " + line.strip()
+
 if current_question:
     questions.append(current_question)
 
-# 2. 정답 매핑
+# OCR 처리 대상 필터링
+for q in questions:
+    if len(q["choices"]) < 4:
+        ocr_needed.append(q)
+
+# OCR 추출 함수
+def extract_choices_with_ocr(page, bbox=None):
+    # 이미지로 페이지 추출
+    pix = page.get_pixmap(dpi=300)
+    img = Image.open(io.BytesIO(pix.tobytes()))
+    if bbox:
+        img = img.crop(bbox)
+
+    img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+    ocr_text = pytesseract.image_to_string(img_cv, lang="eng+kor")
+    results = []
+    for match in choice_re.finditer(ocr_text):
+        label = label_map.get(match.group(1))
+        body = match.group(2).strip()
+        results.append({
+            "label": label,
+            "body": body
+        })
+    return results
+
+# OCR 수행
+for q in ocr_needed:
+    page = doc[q["page"]]
+    new_choices = extract_choices_with_ocr(page)
+    if new_choices:
+        q["choices"] = new_choices
+
+# 정답 매핑
 for q in questions:
     try:
         correct_label = answer_keys[q["number"] - 1]
         for c in q["choices"]:
             c["isCorrect"] = (c["label"] == correct_label)
     except IndexError:
-        print(f"정답 없음: {q['number']}번")
+        for c in q["choices"]:
+            c["isCorrect"] = False
 
-# 3. 이미지 추출 (옵션)
-Path(IMG_DIR).mkdir(exist_ok=True)
-for i, page in enumerate(doc):
-    for img_index, img in enumerate(page.get_images(full=True)):
-        base_image = doc.extract_image(img[0])
-        ext = base_image['ext']
-        image_bytes = base_image['image']
-        image_path = os.path
+# 검증 요약
+summary = {
+    "total_questions": len(questions),
+    "subjects": {},
+    "ocr_fixed": [q["number"] for q in ocr_needed if len(q["choices"]) == 4],
+    "incomplete_choices": [q["number"] for q in questions if len(q["choices"]) != 4],
+    "no_answer": [q["number"] for q in questions if not any(c.get("isCorrect") for c in q["choices"])],
+    "samples": questions[:5]
+}
+for q in questions:
+    summary["subjects"].setdefault(q["subject"], 0)
+    summary["subjects"][q["subject"]] += 1
+
+summary["incomplete_choices_count"] = len(summary["incomplete_choices"])
+summary["no_answer_count"] = len(summary["no_answer"])
+summary
 
 # 1. 총 문제 수
 print(f"총 문제 수: {len(questions)}")
@@ -148,7 +175,7 @@ else:
 
 # 5. 샘플 문제 1~3개 출력
 print("\n[샘플 문제 출력]")
-for q in questions[:11]:
+for q in questions[:20]:
     print(f"{q['number']}번 ({q['subject']}): {q['body']}")
     for c in q['choices']:
         mark = "✅" if c.get("isCorrect") else ""
