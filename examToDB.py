@@ -10,7 +10,7 @@ PDF_PATH = "가스기사20200606.pdf"
 IMG_DIR = "images"
 
 # 정규표현식 정의
-subject_re = re.compile(r'^\s*(\d+)과목\s*[:\-]\s*(.+)')
+subject_re = re.compile(r'(\d+)\s*과목\s*[:\-]?\s*(.+)')
 question_re = re.compile(r'^(\d{1,3})\.\s*(.*)')
 choice_re = re.compile(r'([①②③④❶❷❸❹])\s*([^①②③④❶❷❸❹]+)')
 
@@ -66,6 +66,9 @@ for page in doc:
             # 기존 문제 저장
             if current_question:
                 questions.append(current_question)
+            elif current_question and not choice_re.search(line) and not question_re.match(line):
+                # 문제 본문 계속 이어붙이기
+                current_question["body"] += " " + line.strip()    
 
             current_question = {
                 "number": int(q_match.group(1)),
