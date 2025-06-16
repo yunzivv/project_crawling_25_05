@@ -24,9 +24,9 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 회계·세무 > 회계담당자 완료 4954
+# 회계·세무 > 경리 완료 1624
 dutyCtgr = "10029"
-duty = "1000207"
+duty = "1000208"
 
 payload = {
     "condition": {
@@ -37,9 +37,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 4954,
-    "Page": 11,
-    "PageSize": 400
+    "TotalCount": 1624,
+    "Page": 1,
+    "PageSize": 406
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기

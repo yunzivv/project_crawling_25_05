@@ -1,9 +1,9 @@
-import fitz  # PyMuPDF
-import re
-import pytesseract
+import fitz  # PyMuPDF: pdf 읽기
+import re # 정규식
+import pytesseract # OCR
 from PIL import Image
 import io
-import cv2
+import cv2 # 이미지 처리
 import numpy as np
 from collections import defaultdict
 
@@ -22,7 +22,7 @@ answer_keys = [  # 문제 번호 순서
     2,2,1,4,1,4,3,4,3,1,
     2,3,2,2,4,1,1,4,1,4,
     2,3,2,2,4,1,1,4,1,4,
-    1,2,3,2,4,2,3,2,3,3,
+    2,2,3,2,4,2,3,2,3,3,
     2,2,1,3,1,2,2,1,4,3,
     1,4,1,4,2,2,1,4,4,3,
     2,2,1,3,4,1,1,2,1,2,
@@ -95,12 +95,20 @@ for q in questions:
 def extract_choices_with_ocr(page, bbox=None):
     # 이미지로 페이지 추출
     pix = page.get_pixmap(dpi=300)
-    img = Image.open(io.BytesIO(pix.tobytes()))
+    img_path = f"page_{page.number}.png"
+    pix.save(img_path)
+    print(f"이미지 저장 완료: {img_path}")
+    
+    img = Image.open(img_path)
     if bbox:
         img = img.crop(bbox)
 
     img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
     ocr_text = pytesseract.image_to_string(img_cv, lang="eng+kor")
+    print("===== OCR 텍스트 시작 =====")
+    print(ocr_text)
+    print("===== OCR 텍스트 끝 =====")    
+    
     results = []
     for match in choice_re.finditer(ocr_text):
         label = label_map.get(match.group(1))
