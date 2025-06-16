@@ -10,7 +10,7 @@ from collections import defaultdict
 # ocr-env_examToDB\Scripts\activate
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-PDF_PATH = "가스기사20200606_2.pdf"
+PDF_PATH = "가스기사20200606_3.pdf"
 
 subject_re = re.compile(r'(\d+)\s*과목\s*[:\-]?\s*(.+)')
 question_re = re.compile(r'^(\d{1,3})\.\s*(.*)')
@@ -86,45 +86,57 @@ for page_index, page in enumerate(doc):
 if current_question:
     questions.append(current_question)
 
-# OCR 처리 대상 필터링
+# 이미지 처리 대상 필터링
 for q in questions:
     if len(q["choices"]) < 4:
         ocr_needed.append(q)
 
-# OCR 추출 함수
-def extract_choices_with_ocr(page, bbox=None):
-    # 이미지로 페이지 추출
+# 이미지 저장 함수
+def save_cropped_box_image(page, q_number):
+    # 1. PDF 페이지를 이미지로 변환
     pix = page.get_pixmap(dpi=300)
-    img_path = f"page_{page.number}.png"
-    pix.save(img_path)
-    print(f"이미지 저장 완료: {img_path}")
-    
-    img = Image.open(img_path)
-    if bbox:
-        img = img.crop(bbox)
+    img = Image.open(io.BytesIO(pix.tobytes(output="png")))
 
+    # 2. PIL → OpenCV 이미지로 변환
     img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-    ocr_text = pytesseract.image_to_string(img_cv, lang="eng+kor")
-    print("===== OCR 텍스트 시작 =====")
-    print(ocr_text)
-    print("===== OCR 텍스트 끝 =====")    
-    
-    results = []
-    for match in choice_re.finditer(ocr_text):
-        label = label_map.get(match.group(1))
-        body = match.group(2).strip()
-        results.append({
-            "label": label,
-            "body": body
-        })
-    return results
 
-# OCR 수행
+    # 3. 그레이스케일 + 이진화 (검은 테두리 강조)
+    gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+
+    # 4. 윤곽선(컨투어) 찾기
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # 5. 네모 중 크기 큰 것 1개만 선택
+    largest_box = None
+    max_area = 0
+    for cnt in contours:
+        approx = cv2.approxPolyDP(cnt, 0.02 * cv2.arcLength(cnt, True), True)
+        area = cv2.contourArea(cnt)
+
+        if len(approx) == 4 and area > 10000 and area > max_area:
+            x, y, w, h = cv2.boundingRect(cnt)
+            largest_box = (x, y, w, h)
+            max_area = area
+
+    # 6. 박스를 잘라서 저장
+    if largest_box:
+        x, y, w, h = largest_box
+        cropped = img_cv[y:y+h, x:x+w]
+        save_path = f"cropped_q{q_number}_page{page.number}.png"
+        cv2.imwrite(save_path, cropped)
+        print(f"✅ 잘라낸 박스 저장됨: {save_path}")
+    else:
+        print(f"⚠️ {q_number}번: 박스 인식 실패. 전체 저장.")
+        # fallback: 전체 저장
+        full_path = f"full_q{q_number}_page{page.number}.png"
+        pix.save(full_path)
+
+
+# 이미지 저장
 for q in ocr_needed:
     page = doc[q["page"]]
-    new_choices = extract_choices_with_ocr(page)
-    if new_choices:
-        q["choices"] = new_choices
+    save_cropped_box_image(page, q["number"])
 
 # 정답 매핑
 for q in questions:
@@ -188,9 +200,9 @@ else:
     print("\n✅ 모든 문제에 정답 매핑 완료")
 
 # 5. 샘플 문제 1~3개 출력
-print("\n[샘플 문제 출력]")
-for q in questions[40:61]:
-    print(f"{q['number']}번 ({q['subject']}): {q['body']}")
-    for c in q['choices']:
-        mark = "✅" if c.get("isCorrect") else ""
-        print(f"  - {c['label']}: {c['body']} {mark}")
+# print("\n[샘플 문제 출력]")
+# for q in questions[:10]:
+#     print(f"{q['number']}번 ({q['subject']}): {q['body']}")
+#     for c in q['choices']:
+#         mark = "✅" if c.get("isCorrect") else ""
+#         print(f"  - {c['label']}: {c['body']} {mark}")
