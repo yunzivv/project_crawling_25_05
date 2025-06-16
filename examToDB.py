@@ -13,8 +13,29 @@ from collections import defaultdict
 import docx
 import re
 import os
+from docx.document import Document as _Document
+from docx.oxml.text.paragraph import CT_P
+from docx.oxml.table import CT_Tbl
+from docx.table import _Cell, Table
+from docx.text.paragraph import Paragraph
 
-# ✅ 파일명에서 자격증명과 날짜 추출
+
+# ✅ 문서 안의 문단과 표를 "원래 순서대로" 순회
+def iter_block_items(parent):
+    if isinstance(parent, _Document):
+        parent_elm = parent.element.body
+    elif isinstance(parent, _Cell):
+        parent_elm = parent._tc
+    else:
+        raise ValueError("Unsupported parent")
+
+    for child in parent_elm.iterchildren():
+        if isinstance(child, CT_P):
+            yield Paragraph(child, parent)
+        elif isinstance(child, CT_Tbl):
+            yield Table(child, parent)
+
+# ✅ 파일명에서 제목, 날짜 추출
 def extract_title_info(filename):
     basename = os.path.basename(filename)
     name, _ = os.path.splitext(basename)
@@ -23,13 +44,25 @@ def extract_title_info(filename):
         return match.group(1).strip(), match.group(2)
     return name, None
 
-# ✅ docx 문서에서 본문 추출
-def read_docx(filepath):
-    doc = docx.Document(filepath)
-    return [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+# ✅ 텍스트 순서대로 리스트로 추출 (문단 + 표)
+def extract_all_text_ordered(doc):
+    texts = []
+    for block in iter_block_items(doc):
+        if isinstance(block, Paragraph):
+            text = block.text.strip()
+            if text:
+                texts.append(text)
+        elif isinstance(block, Table):
+            for row in block.rows:
+                for cell in row.cells:
+                    for para in cell.paragraphs:
+                        text = para.text.strip()
+                        if text:
+                            texts.append(text)
+    return texts
 
-# ✅ 시험지 분석: 과목, 문제, 보기 추출
-def parse_exam(paragraphs):
+# ✅ 시험지 파서
+def parse_exam(texts):
     data = {
         "subjects": []
     }
@@ -42,11 +75,9 @@ def parse_exam(paragraphs):
     question_pattern = re.compile(r"^(\d+)[.\\)]")
     choice_pattern = re.compile(r"[①②③④❶❷❸❹]")
 
-    for i, para in enumerate(paragraphs):
-        # 과목 줄 감지
-        subj_match = subject_pattern.match(para)
+    for i, text in enumerate(texts):
+        subj_match = subject_pattern.match(text)
         if subj_match:
-            # 이전 과목 저장
             if current_subject:
                 if question_buffer:
                     current_subject["questions"].append({
@@ -63,14 +94,12 @@ def parse_exam(paragraphs):
             }
             continue
 
-        # 문제 번호 감지
-        q_match = question_pattern.match(para)
+        q_match = question_pattern.match(text)
         if q_match:
             if current_subject is None:
-                print(f"⚠️ 과목 없이 문제 발견 (문단 {i}): {para}")
+                print(f"⚠️ 과목 없이 문제 발견 (문단 {i}): {text}")
                 continue
 
-            # 이전 문제 저장
             if question_buffer:
                 current_subject["questions"].append({
                     "question_number": question_number,
@@ -78,14 +107,12 @@ def parse_exam(paragraphs):
                 })
 
             question_number = int(q_match.group(1))
-            question_buffer = [para]
+            question_buffer = [text]
             continue
 
-        # 선택지 또는 일반 문단 → 현재 문제에 이어 붙임
         if question_buffer:
-            question_buffer.append(para)
+            question_buffer.append(text)
 
-    # 마지막 문제 저장
     if current_subject and question_buffer:
         current_subject["questions"].append({
             "question_number": question_number,
@@ -95,22 +122,25 @@ def parse_exam(paragraphs):
 
     return data
 
-# ✅ 메인 처리 흐름
+# ✅ 메인 실행
 def main(docx_path):
     title, date = extract_title_info(docx_path)
     print(f"제목: {title}, 날짜: {date if date else '날짜 없음'}")
 
-    paragraphs = read_docx(docx_path)
-    exam_data = parse_exam(paragraphs)
+    doc = docx.Document(docx_path)
+    texts = extract_all_text_ordered(doc)
 
-    # 요약 출력
+    exam_data = parse_exam(texts)
+
     for subj in exam_data['subjects']:
         print(f"\n📘 {subj['subject_number']}과목: {subj['subject_name']}")
         print(f"총 {len(subj['questions'])}문제")
-        for q in subj['questions'][:2]:  # 미리보기 2문제
+        for q in subj['questions'][:2]:
             print(f"  - {q['question_number']}번: {q['question_text'][:60]}...")
 
     return exam_data
+
+
 
 # ✅ 파일 실행 (변경 가능)
 if __name__ == "__main__":
