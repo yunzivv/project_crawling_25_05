@@ -26,9 +26,9 @@ import requests
 #     href = link.get('href')
 #     full_url = requests.compat.urljoin(url, href)  # 상대 경로 보완
 #     data.append({'자격등급': '산업기사', 
-#                  '자격증명': title, 
+#                  'certName': title, 
 #                  'href': full_url, 
-#                  '종류': '필기', 
+#                  'category': '필기', 
 #                  'regDate': time.strftime('%Y.%m.%d - %H:%M:%S')})
 
 # file_path = 'exam.xlsx'
@@ -49,7 +49,7 @@ import requests
 # 게시판에서 hwp 다운로드
 
 BASE_URL = "https://www.comcbt.com"
-SAVE_DIR = "hwp_files"
+SAVE_DIR = "pdf_files"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 def get_post_links(board_url):
@@ -101,19 +101,19 @@ def download_hwp_from_post(title, post_url):
     hwp_links = []
     for link in links:
         link_text = link.get_text(strip=True)
-        if link_text.endswith('.hwp') and '(교사용)' in link_text:
+        if link_text.endswith('.pdf') and '(학생용)' in link_text:
             href = link.get('href')
             if href:
                 hwp_links.append((link_text, href))
 
     if not hwp_links:
-        print("  ⚠️ '(교사용).hwp' 링크 없음")
+        print("  ⚠️ '(학생용).hwp' 링크 없음")
         return
 
     link_text, href = hwp_links[0]
     file_url = requests.compat.urljoin(BASE_URL, href)
     # () 앞까지 잘라서 파일명 생성
-    filename = link_text.split('(')[0].strip() + '.hwp'
+    filename = link_text.split('(')[0].strip() + '.pdf'
     save_path = os.path.join(SAVE_DIR, filename)
 
     if os.path.exists(save_path):
