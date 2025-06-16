@@ -24,9 +24,9 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 회계·세무 > 감사 완료 150
+# 회계·세무 > IR·공시 완료 146
 dutyCtgr = "10029"
-duty = "1000211"
+duty = "1000212"
 
 payload = {
     "condition": {
@@ -37,7 +37,7 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 150,
+    "TotalCount": 146,
     "Page": 1,
     "PageSize": 150
 }
