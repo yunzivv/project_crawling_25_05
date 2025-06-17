@@ -59,13 +59,26 @@ def extract_answers_from_zigzag_table(table):
 
 # 선택지 추출
 def extract_choices_from_lines(lines):
+    joined = " ".join(lines)
+    
+    # 선택지 번호로 split
+    split_choices = re.split(r"(①|②|③|④|❶|❷|❸|❹)", joined)
+
+    choice_chunks = []
+    for i in range(1, len(split_choices) - 1, 2):
+        number = split_choices[i]
+        text = split_choices[i + 1].strip()
+        choice_chunks.append((number, text))
+
+    # 딱 4개로 보정
+    while len(choice_chunks) < 4:
+        choice_chunks.append(("?", ""))
+
     choices = []
-    choice_pattern = re.compile(r"[①②③④❶❷❸❹]\s*([^①②③④❶❷❸❹]+)")
-    full_text = " ".join(lines)
-    for idx, match in enumerate(choice_pattern.finditer(full_text)):
+    for idx, (_, text) in enumerate(choice_chunks):
         choices.append({
             "number": idx + 1,
-            "text": match.group(1).strip(),
+            "text": text,
             "has_image": False,
             "image_url": None
         })
@@ -177,9 +190,9 @@ def upload_image_to_imgur(image_bytes):
 
 def assign_image_flags(doc, exam_data):
     paragraphs = list(doc.paragraphs)
-
-    # 이미지 위치 수집
     image_indices = {}
+    
+    # 이미지 포함 문단 수집
     for i, para in enumerate(paragraphs):
         for run in para.runs:
             drawing = run._element.xpath(".//*[local-name()='drawing']")
@@ -192,11 +205,10 @@ def assign_image_flags(doc, exam_data):
                     image_indices[i] = image_bytes
 
     current_index = 0
-    used_image_indices = set()  # 어떤 이미지가 어디에 할당됐는지 추적
 
     for subj in exam_data["subjects"]:
         for q in subj["questions"]:
-            # 문제 시작 위치 찾기
+            # 문제 시작 위치
             found = False
             for i in range(current_index, len(paragraphs)):
                 if q["question_text"].split()[0] in paragraphs[i].text:
@@ -207,31 +219,30 @@ def assign_image_flags(doc, exam_data):
                 continue
             current_index = start
 
-            # 문제 이미지 찾기: 이미지 있는 문단 중 start 기준 앞뒤 5칸 탐색
+            # 문제 이미지: 문제 텍스트와 같은 문단 혹은 다음 문단만 검색
             q["question_has_image"] = False
             q["question_image_url"] = None
-            for idx in range(start - 2, start + 5):
-                if 0 <= idx < len(paragraphs) and idx in image_indices and idx not in used_image_indices:
+            for idx in range(start, start + 4):
+                if idx in image_indices:
                     q["question_has_image"] = True
                     img_url = upload_image_to_imgur(image_indices[idx])
                     if img_url:
                         q["question_image_url"] = img_url
-                        used_image_indices.add(idx)
-                        break
+                    break
 
-            # 선택지 이미지 탐색: 텍스트 없이 이미지만 있는 문단과 매핑
+            # 선택지 이미지: 문제 이후 문단부터 10개 내에서 텍스트 없고 이미지 있는 문단
             for ch in q["choices"]:
                 ch["has_image"] = False
                 ch["image_url"] = None
-                for idx in range(start, start + 10):  # 넉넉히 앞으로 10칸
-                    if 0 <= idx < len(paragraphs):
-                        if paragraphs[idx].text.strip() == "" and idx in image_indices and idx not in used_image_indices:
+                for idx in range(start + 2, start + 12):
+                    if idx in image_indices:
+                        para_text = paragraphs[idx].text.strip()
+                        if not para_text or ch["text"] in para_text:
                             ch["has_image"] = True
                             img_url = upload_image_to_imgur(image_indices[idx])
                             if img_url:
                                 ch["image_url"] = img_url
-                                used_image_indices.add(idx)
-                                break
+                            break
 
 
 # 메인 실행
