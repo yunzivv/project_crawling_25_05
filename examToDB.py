@@ -1,26 +1,24 @@
 import fitz  # PyMuPDF: pdf 읽기
 import re # 정규식
 import pytesseract # OCR
-from PIL import Image
-import io
-import cv2 # 이미지 처리
-import numpy as np
-import docx
-from collections import defaultdict
-
-# ocr-env_examToDB\Scripts\activate
-
-import docx
-import re
-import os
+from PIL import Image # 이미지 분석
+import cv2 # 이미지 자르기
+import numpy as np # 이미지 데이터 배열 저장
+import docx # 워드 문서 다루기
+from collections import defaultdict # 딕셔너리 같은 데이터 구조
+import os # 파일, 디렉토리 관리
+from docx import Document
 from docx.document import Document as _Document
 from docx.oxml.text.paragraph import CT_P
 from docx.oxml.table import CT_Tbl
 from docx.table import _Cell, Table
 from docx.text.paragraph import Paragraph
 
+# ocr-env_examToDB\Scripts\activate
+# python examToDB.py
 
-# ✅ 문서 안의 문단과 표를 "원래 순서대로" 순회
+
+# 문서 안의 문단과 표를 원래 순서대로 순회
 def iter_block_items(parent):
     if isinstance(parent, _Document):
         parent_elm = parent.element.body
@@ -28,14 +26,14 @@ def iter_block_items(parent):
         parent_elm = parent._tc
     else:
         raise ValueError("Unsupported parent")
-
     for child in parent_elm.iterchildren():
         if isinstance(child, CT_P):
             yield Paragraph(child, parent)
         elif isinstance(child, CT_Tbl):
             yield Table(child, parent)
 
-# ✅ 파일명에서 제목, 날짜 추출
+
+# 파일명에서 자격증명과 날짜 추출
 def extract_title_info(filename):
     basename = os.path.basename(filename)
     name, _ = os.path.splitext(basename)
@@ -44,7 +42,8 @@ def extract_title_info(filename):
         return match.group(1).strip(), match.group(2)
     return name, None
 
-# ✅ 텍스트 순서대로 리스트로 추출 (문단 + 표)
+
+# 문단과 표 텍스트 추출
 def extract_all_text_ordered(doc):
     texts = []
     for block in iter_block_items(doc):
@@ -61,19 +60,30 @@ def extract_all_text_ordered(doc):
                             texts.append(text)
     return texts
 
-# ✅ 시험지 파서
-def parse_exam(texts):
-    data = {
-        "subjects": []
-    }
 
+# 선택지 추출
+def extract_choices_from_lines(lines):
+    choices = []
+    choice_pattern = re.compile(r"([①②③④❶❷❸❹])\s*([^①②③④❶❷❸❹]+)")
+    full_text = " ".join(lines)
+    for match in choice_pattern.finditer(full_text):
+        choices.append({
+            "symbol": match.group(1),
+            "text": match.group(2).strip(),
+            "has_image": False  # 추후 이미지 감지에 사용
+        })
+    return choices
+
+
+# 시험지 파서 개선 (선택지 포함, 이미지 여부 포함)
+def parse_exam(texts):
+    data = {"subjects": []}
     current_subject = None
     question_buffer = []
     question_number = 0
 
-    subject_pattern = re.compile(r"^\s*(\d+)과목\s*[:：]\s*(.+)$")
-    question_pattern = re.compile(r"^(\d+)[.\\)]")
-    choice_pattern = re.compile(r"[①②③④❶❷❸❹]")
+    subject_pattern = re.compile(r"^(\d+)과목\s*[:：]\s*(.+)$")
+    question_pattern = re.compile(r"^(\d+)[.\)]")
 
     for i, text in enumerate(texts):
         subj_match = subject_pattern.match(text)
@@ -82,11 +92,12 @@ def parse_exam(texts):
                 if question_buffer:
                     current_subject["questions"].append({
                         "question_number": question_number,
-                        "question_text": " ".join(question_buffer)
+                        "question_text": " ".join(question_buffer),
+                        "choices": extract_choices_from_lines(question_buffer),
+                        "question_has_image": False,  # 추후 이미지 확인용
                     })
                     question_buffer = []
                 data["subjects"].append(current_subject)
-
             current_subject = {
                 "subject_number": int(subj_match.group(1)),
                 "subject_name": subj_match.group(2).strip(),
@@ -99,13 +110,13 @@ def parse_exam(texts):
             if current_subject is None:
                 print(f"⚠️ 과목 없이 문제 발견 (문단 {i}): {text}")
                 continue
-
             if question_buffer:
                 current_subject["questions"].append({
                     "question_number": question_number,
-                    "question_text": " ".join(question_buffer)
+                    "question_text": " ".join(question_buffer),
+                    "choices": extract_choices_from_lines(question_buffer),
+                    "question_has_image": False,
                 })
-
             question_number = int(q_match.group(1))
             question_buffer = [text]
             continue
@@ -116,33 +127,34 @@ def parse_exam(texts):
     if current_subject and question_buffer:
         current_subject["questions"].append({
             "question_number": question_number,
-            "question_text": " ".join(question_buffer)
+            "question_text": " ".join(question_buffer),
+            "choices": extract_choices_from_lines(question_buffer),
+            "question_has_image": False,
         })
         data["subjects"].append(current_subject)
 
     return data
 
-# ✅ 메인 실행
+
+# 메인 실행
+
 def main(docx_path):
     title, date = extract_title_info(docx_path)
     print(f"제목: {title}, 날짜: {date if date else '날짜 없음'}")
-
-    doc = docx.Document(docx_path)
+    doc = Document(docx_path)
     texts = extract_all_text_ordered(doc)
-
     exam_data = parse_exam(texts)
 
     for subj in exam_data['subjects']:
         print(f"\n📘 {subj['subject_number']}과목: {subj['subject_name']}")
         print(f"총 {len(subj['questions'])}문제")
         for q in subj['questions'][:2]:
-            print(f"  - {q['question_number']}번: {q['question_text'][:60]}...")
+            print(f"  - {q['question_number']}번 문제: {q['question_text']}")
+            for ch in q['choices']:
+                print(f"    {ch['symbol']} {ch['text'][:40]}")
 
     return exam_data
 
 
-
-# ✅ 파일 실행 (변경 가능)
 if __name__ == "__main__":
-    docx_file = "가스기사20200606.docx"
-    main(docx_file)
+    main("가스기사20200606.docx")
