@@ -209,7 +209,8 @@ def assign_image_flags(doc, exam_data):
 
     for subj in exam_data["subjects"]:
         questions = subj["questions"]
-        for idx, q in enumerate(questions):
+        for qidx, q in enumerate(questions):
+            # 문제 시작 위치 탐색
             found = False
             for i in range(current_index, len(paragraphs)):
                 if q["question_text"][:10] in paragraphs[i].text:
@@ -218,20 +219,18 @@ def assign_image_flags(doc, exam_data):
                     break
             if not found:
                 continue
-
             current_index = start
-            next_q_text = questions[idx + 1]["question_text"][:10] if idx + 1 < len(questions) else None
-            end_index = None
 
+            # 다음 문제 시작 전까지 범위 제한
+            next_q_text = questions[qidx + 1]["question_text"][:10] if qidx + 1 < len(questions) else None
+            end_index = len(paragraphs)
             if next_q_text:
                 for j in range(start + 1, len(paragraphs)):
                     if next_q_text in paragraphs[j].text:
                         end_index = j
                         break
-            if end_index is None:
-                end_index = start + 10
 
-            # 문제 이미지: start부터 end_index 사이에서 텍스트 있는 문단 포함하여 처음 등장하는 이미지
+            # 문제 이미지 탐색
             q["question_has_image"] = False
             q["question_image_url"] = None
             for idx_img in range(start, end_index):
@@ -243,29 +242,32 @@ def assign_image_flags(doc, exam_data):
                         used_image_indices.add(idx_img)
                     break
 
-            # 선택지 이미지: end_index 전까지 image-only 문단 우선 사용
-            image_only = [i for i in range(start, end_index)
-                          if i in image_indices and not paragraphs[i].text.strip() and i not in used_image_indices]
+            # 선택지 이미지 초기화
+            for ch in q["choices"]:
+                ch["has_image"] = False
+                ch["image_url"] = None
 
-            if len(image_only) >= 4:
-                for i, ch in zip(image_only[:4], q["choices"]):
+            # 텍스트 없는 이미지 문단 우선 탐색
+            image_only = [
+                i for i in range(start, end_index)
+                if i in image_indices and not paragraphs[i].text.strip() and i not in used_image_indices
+            ]
+
+            image_ptr = 0
+            for ch in q["choices"]:
+                if image_ptr < len(image_only):
                     ch["has_image"] = True
-                    img_url = upload_image_to_imgur(image_indices[i])
-                    ch["image_url"] = img_url
-                    used_image_indices.add(i)
-            else:
-                # 텍스트 포함 문단 중에서도 매칭 시도 (단, 아직 사용되지 않은 것만)
-                for ch in q["choices"]:
-                    ch["has_image"] = False
-                    ch["image_url"] = None
+                    ch["image_url"] = upload_image_to_imgur(image_indices[image_only[image_ptr]])
+                    used_image_indices.add(image_only[image_ptr])
+                    image_ptr += 1
+                elif not ch["text"].strip():
+                    # 보기 텍스트가 없는 경우: 아무 이미지라도 사용
                     for i in range(start, end_index):
                         if i in image_indices and i not in used_image_indices:
-                            para_text = paragraphs[i].text.strip()
-                            if not para_text or ch["text"] in para_text:
-                                ch["has_image"] = True
-                                ch["image_url"] = upload_image_to_imgur(image_indices[i])
-                                used_image_indices.add(i)
-                                break
+                            ch["has_image"] = True
+                            ch["image_url"] = upload_image_to_imgur(image_indices[i])
+                            used_image_indices.add(i)
+                            break
 
 
 
