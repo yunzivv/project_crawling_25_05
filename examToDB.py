@@ -177,6 +177,8 @@ def upload_image_to_imgur(image_bytes):
 
 def assign_image_flags(doc, exam_data):
     paragraphs = list(doc.paragraphs)
+
+    # 이미지 위치 수집
     image_indices = {}
     for i, para in enumerate(paragraphs):
         for run in para.runs:
@@ -189,10 +191,12 @@ def assign_image_flags(doc, exam_data):
                     image_bytes = image_part.blob
                     image_indices[i] = image_bytes
 
-
     current_index = 0
+    used_image_indices = set()  # 어떤 이미지가 어디에 할당됐는지 추적
+
     for subj in exam_data["subjects"]:
         for q in subj["questions"]:
+            # 문제 시작 위치 찾기
             found = False
             for i in range(current_index, len(paragraphs)):
                 if q["question_text"].split()[0] in paragraphs[i].text:
@@ -203,26 +207,32 @@ def assign_image_flags(doc, exam_data):
                 continue
             current_index = start
 
-            # 문제 이미지
-            for idx in range(start, start + 5):
-                if idx in image_indices:
+            # 문제 이미지 찾기: 이미지 있는 문단 중 start 기준 앞뒤 5칸 탐색
+            q["question_has_image"] = False
+            q["question_image_url"] = None
+            for idx in range(start - 2, start + 5):
+                if 0 <= idx < len(paragraphs) and idx in image_indices and idx not in used_image_indices:
                     q["question_has_image"] = True
                     img_url = upload_image_to_imgur(image_indices[idx])
                     if img_url:
                         q["question_image_url"] = img_url
-                    break
+                        used_image_indices.add(idx)
+                        break
 
-            # 선택지 이미지
+            # 선택지 이미지 탐색: 텍스트 없이 이미지만 있는 문단과 매핑
             for ch in q["choices"]:
                 ch["has_image"] = False
                 ch["image_url"] = None
-                for idx in range(start, start + 5):
-                    if ch["text"] in paragraphs[idx].text and idx in image_indices:
-                        ch["has_image"] = True
-                        img_url = upload_image_to_imgur(image_indices[idx])
-                        if img_url:
-                            ch["image_url"] = img_url
-                        break
+                for idx in range(start, start + 10):  # 넉넉히 앞으로 10칸
+                    if 0 <= idx < len(paragraphs):
+                        if paragraphs[idx].text.strip() == "" and idx in image_indices and idx not in used_image_indices:
+                            ch["has_image"] = True
+                            img_url = upload_image_to_imgur(image_indices[idx])
+                            if img_url:
+                                ch["image_url"] = img_url
+                                used_image_indices.add(idx)
+                                break
+
 
 # 메인 실행
 def main(docx_path):
