@@ -49,21 +49,6 @@ def extract_answers_from_table(table):
                 answers[int(q)] = a
     return answers
 
-# 문제 시작 위치 탐색
-def find_question_start(paragraphs, q_text, from_idx):
-    q_start_text = q_text[:20].replace(" ", "")
-    best_score = 0
-    best_idx = -1
-    for i in range(from_idx, len(paragraphs)):
-        para_text = paragraphs[i].text.replace(" ", "")
-        score = difflib.SequenceMatcher(None, q_start_text, para_text[:len(q_start_text)]).ratio()
-        if score > best_score:
-            best_score = score
-            best_idx = i
-        if score > 0.85:
-            return i
-    return best_idx if best_score > 0.6 else -1
-
 # 이미지 업로드
 def upload_image_to_imgur(image_bytes):
     CLIENT_ID = '00ff8e726eb9eb8'
@@ -97,124 +82,172 @@ def split_question_and_choices(text):
             return " ".join(lines[:i]), extract_choices(" ".join(lines[i:]))
     return text, extract_choices("")
 
-# 본문 파싱
-def parse_exam(doc):
-    blocks = list(iter_block_items(doc))
+# 이미지 처리
+def assign_images(doc, exam_data):
     paragraphs = []
-    para_to_index = {}
-
-    for idx, b in enumerate(blocks):
+    for b in iter_block_items(doc):
         if isinstance(b, Paragraph):
             paragraphs.append(b)
-            para_to_index[id(b)] = idx
         elif isinstance(b, Table):
             for row in b.rows:
                 for cell in row.cells:
-                    for para in cell.paragraphs:
-                        paragraphs.append(para)
-                        para_to_index[id(para)] = idx
+                    paragraphs.extend(cell.paragraphs)
 
-    print(f"📄 전체 문단 수: {len(paragraphs)}")
+    image_indices = {}
+    for i, p in enumerate(paragraphs):
+        for run in p.runs:
+            drawing = run._element.xpath(".//*[local-name()='drawing']")
+            if drawing:
+                blip = drawing[0].xpath(".//*[local-name()='blip']")
+                if blip:
+                    rId = blip[0].get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed")
+                    image_part = doc.part.related_parts[rId]
+                    image_bytes = image_part.blob
+                    image_indices[i] = image_bytes
 
-    # 과목 추출
+    used = set()
+    for subj in exam_data["subjects"]:
+        for q in subj["questions"]:
+            start_idx = next((i for i, p in enumerate(paragraphs) if q["question_text"][:10].strip() in p.text), -1)
+            if start_idx == -1:
+                continue
+            # 문제 이미지
+            for offset in range(5):
+                idx = start_idx + offset
+                if idx in image_indices and idx not in used:
+                    q["question_has_image"] = True
+                    q["question_image_url"] = upload_image_to_imgur(image_indices[idx])
+                    used.add(idx)
+                    break
+
+            # 선택지 이미지
+            img_candidates = [i for i in range(start_idx + 1, start_idx + 10) if i in image_indices and not paragraphs[i].text.strip() and i not in used]
+            for i, ch in enumerate(q["choices"]):
+                if ch["text"]:
+                    continue
+                if i < len(img_candidates):
+                    ch["has_image"] = True
+                    ch["image_url"] = upload_image_to_imgur(image_indices[img_candidates[i]])
+                    used.add(img_candidates[i])
+
+# 문서 파싱
+
+def parse_exam(doc):
+    paragraphs = []
+    for b in iter_block_items(doc):
+        if isinstance(b, Paragraph):
+            paragraphs.append(b)
+        elif isinstance(b, Table):
+            for row in b.rows:
+                for cell in row.cells:
+                    paragraphs.extend(cell.paragraphs)
+
+    blocks = list(iter_block_items(doc))
+    tables = [b for b in blocks if isinstance(b, Table)]
+    answer_table = tables[-1] if tables else None
+    answers = extract_answers_from_table(answer_table) if answer_table else {}
+
     subjects = []
-    for idx, b in enumerate(blocks):
+    for b in blocks:
         if isinstance(b, Table) and len(b.rows) == 1 and len(b.rows[0].cells) == 1:
             text = b.rows[0].cells[0].text.strip()
             print(f"🔍 과목 후보 텍스트: '{text}'")
-            m = re.match(r"^(\d)과목\s*[:：]\s*(.+)$", text)
+            m = re.match(r"(\d)과목\s*[:：]\s*(.+)", text)
             if m:
                 print(f"✅ 과목 인식 성공: {text}")
-                subjects.append((int(m.group(1)), m.group(2).strip(), idx))
+                subjects.append((int(m.group(1)), m.group(2), b))
 
     if not subjects:
         print("❌ 과목을 찾지 못했습니다. 파싱이 실패했을 수 있습니다.")
         return {"subjects": []}
 
-    # 마지막 테이블을 정답표로 사용
-    answer_table = None
-    for b in reversed(blocks):
-        if isinstance(b, Table):
-            answer_table = b
-            break
+    subject_indices = []
+    for (_, _, table) in subjects:
+        found = False
+        for para in table.rows[0].cells[0].paragraphs:
+            if para in paragraphs:
+                subject_indices.append(paragraphs.index(para))
+                found = True
+                break
+        if not found:
+            subject_indices.append(-1)
 
-    answers = extract_answers_from_table(answer_table) if answer_table else {}
+    # 음수 제거 + 안전한 종료 지점 추가
+    subject_indices = [i for i in subject_indices if i >= 0]
+    while len(subject_indices) < len(subjects):
+        subject_indices.append(len(paragraphs))  # ⚠️ 부족한 경우 안전하게 문서 끝으로 대체
+    subject_indices.append(len(paragraphs))  # ✅ 마지막 과목의 끝 경계 추가
 
-    subject_starts = [s[2] for s in subjects] + [len(blocks)]  # 끝 인덱스 포함
     data = {"subjects": []}
-
     for i in range(len(subjects)):
-        subj_num, subj_name, start_idx = subjects[i]
-        end_idx = subject_starts[i + 1]
-        subj_blocks = blocks[start_idx:end_idx]
+        number, name, _ = subjects[i]
+        start = subject_indices[i]
+        end = subject_indices[i + 1]
 
         questions = []
-        current_q_num = None
+        current_q = None
         current_text = ""
-
-        for b in subj_blocks:
-            if isinstance(b, Paragraph):
-                text = b.text.strip()
-                if not text:
-                    continue
-                bold = any(run.bold for run in b.runs if run.text.strip())
-                is_question = re.match(r"^\d+[.)]", text)
-                if bold and is_question:
-                    if current_q_num:
-                        q_text, choices = split_question_and_choices(current_text)
-                        questions.append({
-                            "question_number": current_q_num,
-                            "question_text": q_text,
-                            "choices": choices,
-                            "question_has_image": False,
-                            "question_image_url": None,
-                            "answer": answers.get(current_q_num, '')
-                        })
-                    current_q_num = int(is_question.group(0)[:-1])
-                    current_text = text
-                else:
-                    current_text += "\n" + text
-
-        if current_q_num:
+        for p in paragraphs[start:end]:
+            text = p.text.strip()
+            if not text:
+                continue
+            bold = any(run.bold for run in p.runs if run.text.strip())
+            q_match = re.match(r"^(\d+)[.)]", text)
+            if bold and q_match:
+                if current_q:
+                    q_text, choices = split_question_and_choices(current_text)
+                    questions.append({
+                        "question_number": current_q,
+                        "question_text": q_text,
+                        "choices": choices,
+                        "question_has_image": False,
+                        "question_image_url": None,
+                        "answer": answers.get(current_q, '')
+                    })
+                current_q = int(q_match.group(1))
+                current_text = text
+            else:
+                current_text += "\n" + text
+        if current_q:
             q_text, choices = split_question_and_choices(current_text)
             questions.append({
-                "question_number": current_q_num,
+                "question_number": current_q,
                 "question_text": q_text,
                 "choices": choices,
                 "question_has_image": False,
                 "question_image_url": None,
-                "answer": answers.get(current_q_num, '')
+                "answer": answers.get(current_q, '')
             })
 
-        data["subjects"].append({
-            "subject_number": subj_num,
-            "subject_name": subj_name,
-            "questions": questions
-        })
+        data["subjects"].append({"subject_number": number, "subject_name": name, "questions": questions})
 
     return data
 
+# 출력
 
-# 요약 출력
-def print_exam_summary(data):
+def print_exam_summary(data, q_start=9, q_end=11):
     for subj in data['subjects']:
-        print(f"\n📘 과목: {subj['subject_number']}과목 : {subj['subject_name']} - 총 {len(subj['questions'])}문제")
-        for q in subj['questions'][8:11]:  # 처음 3문제만 확인
-            print(f"  - {q['question_number']}번: {q['question_text'][:50]}... (정답: {q['answer']}, 이미지: {'O' if q['question_has_image'] else 'X'})")
+        print(f"\n📘 {subj['subject_number']}과목: {subj['subject_name']}")
+        for q in subj['questions']:
+            if q_start <= q['question_number'] <= q_end:
+                print(f"  - {q['question_number']}번 문제: {q['question_text'][:60]}... (정답: {q['answer']}, 이미지: {'O' if q['question_has_image'] else 'X'})")
+                if q['question_image_url']:
+                    print(f"    문제 이미지 URL: {q['question_image_url']}")
+                for ch in q['choices']:
+                    if ch['has_image']:
+                        print(f"    {ch['number']}번 보기 이미지 URL: {ch['image_url']}")
+                    else:
+                        print(f"    {ch['number']}번 보기 텍스트: {ch['text'][:40]}")
 
-# 메인 실행
+# 실행
+
 def main(path):
     title, date = extract_title_info(path)
     print(f"\n📄 문서: {os.path.basename(path)}")
     doc = Document(path)
-    exam_data = parse_exam(doc)
-
-    # ✅ subjects가 비었는지 확인
-    if not exam_data["subjects"]:
-        print("❌ 과목을 찾지 못했습니다. 파싱이 실패했을 수 있습니다.")
-        return
-
-    print_exam_summary(exam_data)
+    data = parse_exam(doc)
+    assign_images(doc, data)
+    print_exam_summary(data, 9, 11)
 
 if __name__ == "__main__":
     main("가스기사20200606.docx")
