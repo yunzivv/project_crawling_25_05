@@ -17,7 +17,6 @@ from docx.text.paragraph import Paragraph
 # ocr-env_examToDB\Scripts\activate
 # python examToDB.py
 
-
 # 문서 내 요소 순회
 def iter_block_items(parent):
     if isinstance(parent, _Document):
@@ -151,6 +150,43 @@ def parse_exam(texts, answer_table=None):
 
     return data
 
+# 이미지 포함 여부 확인
+def has_image(paragraph):
+    for run in paragraph.runs:
+        if run._element.xpath(".//w:drawing"):
+            return True
+    return False
+
+def assign_image_flags(doc, exam_data):
+    paragraphs = list(doc.paragraphs)
+    image_indices = {i for i, p in enumerate(paragraphs) if has_image(p)}
+
+    current_index = 0
+    for subj in exam_data["subjects"]:
+        for q in subj["questions"]:
+            # 문제 텍스트의 첫 단어로 문단 위치 추정
+            found = False
+            for i in range(current_index, len(paragraphs)):
+                if q["question_text"].split()[0] in paragraphs[i].text:
+                    start = i
+                    found = True
+                    break
+            if not found:
+                continue
+            current_index = start
+
+            # 문제 범위 추정 (해당 문단부터 5문단 내 이미지 확인)
+            q["question_has_image"] = any(idx in image_indices for idx in range(start, start + 5))
+
+            # 보기 이미지 매핑
+            for ch in q["choices"]:
+                ch["has_image"] = False
+                for idx in range(start, start + 5):
+                    if ch["text"] in paragraphs[idx].text and idx in image_indices:
+                        ch["has_image"] = True
+                        break
+
+
 # 메인 실행
 def main(docx_path):
     title, date = extract_title_info(docx_path)
@@ -177,13 +213,15 @@ def main(docx_path):
     answer_table = tables[-1] if tables else None
 
     exam_data = parse_exam(texts, answer_table)
+    assign_image_flags(doc, exam_data)
+
     for subj in exam_data['subjects']:
         print(f"\n📘 {subj['subject_number']}과목: {subj['subject_name']}")
         print(f"총 {len(subj['questions'])}문제")
-        for q in subj['questions'][:2]:
-            print(f"  - {q['question_number']}번 문제: {q['question_text'][:60]}... (정답: {q['answer']})")
+        for q in subj['questions'][16:18]:
+            print(f"  - {q['question_number']}번 문제: {q['question_text'][:60]}... (정답: {q['answer']}, 이미지: {'O' if q['question_has_image'] else 'X'})")
             for ch in q['choices']:
-                print(f"    {ch['number']} {ch['text'][:40]}")
+                print(f"    {ch['number']} {ch['text'][:40]} (이미지: {'O' if ch['has_image'] else 'X'})")
     return exam_data
 
 if __name__ == "__main__":
