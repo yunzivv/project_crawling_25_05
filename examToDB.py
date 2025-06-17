@@ -18,7 +18,7 @@ from docx.text.paragraph import Paragraph
 # python examToDB.py
 
 
-# 문서 안의 문단과 표를 원래 순서대로 순회
+# 문서 내 요소 순회
 def iter_block_items(parent):
     if isinstance(parent, _Document):
         parent_elm = parent.element.body
@@ -32,7 +32,6 @@ def iter_block_items(parent):
         elif isinstance(child, CT_Tbl):
             yield Table(child, parent)
 
-
 # 파일명에서 자격증명과 날짜 추출
 def extract_title_info(filename):
     basename = os.path.basename(filename)
@@ -42,42 +41,53 @@ def extract_title_info(filename):
         return match.group(1).strip(), match.group(2)
     return name, None
 
-
-# 문단과 표 텍스트 추출
-def extract_all_text_ordered(doc):
-    texts = []
-    for block in iter_block_items(doc):
-        if isinstance(block, Paragraph):
-            text = block.text.strip()
-            if text:
-                texts.append(text)
-        elif isinstance(block, Table):
-            for row in block.rows:
-                for cell in row.cells:
-                    for para in cell.paragraphs:
-                        text = para.text.strip()
-                        if text:
-                            texts.append(text)
-    return texts
-
+# 정답 테이블 추출 (지그재그 구조)
+def extract_answers_from_zigzag_table(table):
+    answers = {}
+    rows = table.rows
+    for i in range(0, len(rows), 2):
+        if i + 1 >= len(rows):
+            break
+        q_nums = [cell.text.strip() for cell in rows[i].cells]
+        q_ans = [cell.text.strip() for cell in rows[i+1].cells]
+        for q, a in zip(q_nums, q_ans):
+            if q.isdigit():
+                answers[int(q)] = a
+    return answers
 
 # 선택지 추출
 def extract_choices_from_lines(lines):
     choices = []
-    choice_pattern = re.compile(r"([①②③④❶❷❸❹])\s*([^①②③④❶❷❸❹]+)")
+    choice_pattern = re.compile(r"[①②③④❶❷❸❹]\s*([^①②③④❶❷❸❹]+)")
     full_text = " ".join(lines)
-    for match in choice_pattern.finditer(full_text):
+    for idx, match in enumerate(choice_pattern.finditer(full_text)):
         choices.append({
-            "symbol": match.group(1),
-            "text": match.group(2).strip(),
-            "has_image": False  # 추후 이미지 감지에 사용
+            "number": idx + 1,
+            "text": match.group(1).strip(),
+            "has_image": False
         })
     return choices
 
+# 문제 텍스트와 보기 분리
+def split_question_and_choices(lines):
+    choice_pattern = re.compile(r"[①②③④❶❷❸❹]")
+    question_part = []
+    for line in lines:
+        if choice_pattern.search(line):
+            cut = choice_pattern.search(line).start()
+            question_part.append(line[:cut].strip())
+            break
+        question_part.append(line.strip())
+    qt = " ".join(question_part).strip()
+    choices = extract_choices_from_lines(lines)
+    return qt, choices
 
-# 시험지 파서 개선 (선택지 포함, 이미지 여부 포함)
-def parse_exam(texts):
-    data = {"subjects": []}
+# 시험지 파서 개선
+def parse_exam(texts, answer_table=None):
+    data = {"subjects": [], "answers": {}}
+    if answer_table:
+        data["answers"] = extract_answers_from_zigzag_table(answer_table)
+
     current_subject = None
     question_buffer = []
     question_number = 0
@@ -90,11 +100,13 @@ def parse_exam(texts):
         if subj_match:
             if current_subject:
                 if question_buffer:
+                    qt, choices = split_question_and_choices(question_buffer)
                     current_subject["questions"].append({
                         "question_number": question_number,
-                        "question_text": " ".join(question_buffer),
-                        "choices": extract_choices_from_lines(question_buffer),
-                        "question_has_image": False,  # 추후 이미지 확인용
+                        "question_text": qt,
+                        "choices": choices,
+                        "question_has_image": False,
+                        "answer": data['answers'].get(question_number, '')
                     })
                     question_buffer = []
                 data["subjects"].append(current_subject)
@@ -111,11 +123,13 @@ def parse_exam(texts):
                 print(f"⚠️ 과목 없이 문제 발견 (문단 {i}): {text}")
                 continue
             if question_buffer:
+                qt, choices = split_question_and_choices(question_buffer)
                 current_subject["questions"].append({
                     "question_number": question_number,
-                    "question_text": " ".join(question_buffer),
-                    "choices": extract_choices_from_lines(question_buffer),
+                    "question_text": qt,
+                    "choices": choices,
                     "question_has_image": False,
+                    "answer": data['answers'].get(question_number, '')
                 })
             question_number = int(q_match.group(1))
             question_buffer = [text]
@@ -125,36 +139,52 @@ def parse_exam(texts):
             question_buffer.append(text)
 
     if current_subject and question_buffer:
+        qt, choices = split_question_and_choices(question_buffer)
         current_subject["questions"].append({
             "question_number": question_number,
-            "question_text": " ".join(question_buffer),
-            "choices": extract_choices_from_lines(question_buffer),
+            "question_text": qt,
+            "choices": choices,
             "question_has_image": False,
+            "answer": data['answers'].get(question_number, '')
         })
         data["subjects"].append(current_subject)
 
     return data
 
-
 # 메인 실행
-
 def main(docx_path):
     title, date = extract_title_info(docx_path)
     print(f"제목: {title}, 날짜: {date if date else '날짜 없음'}")
     doc = Document(docx_path)
-    texts = extract_all_text_ordered(doc)
-    exam_data = parse_exam(texts)
+    blocks = list(iter_block_items(doc))
+    texts = []
+    tables = []
+    for b in blocks:
+        if isinstance(b, Paragraph):
+            t = b.text.strip()
+            if t:
+                texts.append(t)
+        elif isinstance(b, Table):
+            tables.append(b)
+            for row in b.rows:
+                for cell in row.cells:
+                    for para in cell.paragraphs:
+                        t = para.text.strip()
+                        if t:
+                            texts.append(t)
 
+    # 마지막 테이블을 정답표로 지정
+    answer_table = tables[-1] if tables else None
+
+    exam_data = parse_exam(texts, answer_table)
     for subj in exam_data['subjects']:
         print(f"\n📘 {subj['subject_number']}과목: {subj['subject_name']}")
         print(f"총 {len(subj['questions'])}문제")
         for q in subj['questions'][:2]:
-            print(f"  - {q['question_number']}번 문제: {q['question_text']}")
+            print(f"  - {q['question_number']}번 문제: {q['question_text'][:60]}... (정답: {q['answer']})")
             for ch in q['choices']:
-                print(f"    {ch['symbol']} {ch['text'][:40]}")
-
+                print(f"    {ch['number']} {ch['text'][:40]}")
     return exam_data
-
 
 if __name__ == "__main__":
     main("가스기사20200606.docx")
