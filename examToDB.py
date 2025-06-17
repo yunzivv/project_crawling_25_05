@@ -7,15 +7,18 @@ import numpy as np # 이미지 데이터 배열 저장
 import docx # 워드 문서 다루기
 from collections import defaultdict # 딕셔너리 같은 데이터 구조
 import os # 파일, 디렉토리 관리
+import requests
+from io import BytesIO # 이미지 플래그 및 업로드
+from PIL import Image
 from docx import Document
 from docx.document import Document as _Document
 from docx.oxml.text.paragraph import CT_P
 from docx.oxml.table import CT_Tbl
 from docx.table import _Cell, Table
 from docx.text.paragraph import Paragraph
-
 # ocr-env_examToDB\Scripts\activate
 # python examToDB.py
+
 
 # 문서 내 요소 순회
 def iter_block_items(parent):
@@ -63,7 +66,8 @@ def extract_choices_from_lines(lines):
         choices.append({
             "number": idx + 1,
             "text": match.group(1).strip(),
-            "has_image": False
+            "has_image": False,
+            "image_url": None
         })
     return choices
 
@@ -105,6 +109,7 @@ def parse_exam(texts, answer_table=None):
                         "question_text": qt,
                         "choices": choices,
                         "question_has_image": False,
+                        "question_image_url": None,
                         "answer": data['answers'].get(question_number, '')
                     })
                     question_buffer = []
@@ -128,6 +133,7 @@ def parse_exam(texts, answer_table=None):
                     "question_text": qt,
                     "choices": choices,
                     "question_has_image": False,
+                    "question_image_url": None,
                     "answer": data['answers'].get(question_number, '')
                 })
             question_number = int(q_match.group(1))
@@ -144,27 +150,49 @@ def parse_exam(texts, answer_table=None):
             "question_text": qt,
             "choices": choices,
             "question_has_image": False,
+            "question_image_url": None,
             "answer": data['answers'].get(question_number, '')
         })
         data["subjects"].append(current_subject)
 
     return data
 
-# 이미지 포함 여부 확인
+# 이미지 여부
 def has_image(paragraph):
     for run in paragraph.runs:
         if run._element.xpath(".//w:drawing"):
             return True
     return False
 
+# imgur 업로드
+def upload_image_to_imgur(image_bytes):
+    CLIENT_ID = '00ff8e726eb9eb8'
+    url = "https://api.imgur.com/3/image"
+    headers = {'Authorization': f'Client-ID {CLIENT_ID}'}
+    response = requests.post(url, headers=headers, files={"image": image_bytes})
+    if response.status_code == 200:
+        return response.json()['data']['link']
+    return None
+
+
 def assign_image_flags(doc, exam_data):
     paragraphs = list(doc.paragraphs)
-    image_indices = {i for i, p in enumerate(paragraphs) if has_image(p)}
+    image_indices = {}
+    for i, para in enumerate(paragraphs):
+        for run in para.runs:
+            drawing = run._element.xpath(".//*[local-name()='drawing']")
+            if drawing:
+                blip = drawing[0].xpath(".//*[local-name()='blip']")
+                if blip:
+                    rId = blip[0].get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed")
+                    image_part = doc.part.related_parts[rId]
+                    image_bytes = image_part.blob
+                    image_indices[i] = image_bytes
+
 
     current_index = 0
     for subj in exam_data["subjects"]:
         for q in subj["questions"]:
-            # 문제 텍스트의 첫 단어로 문단 위치 추정
             found = False
             for i in range(current_index, len(paragraphs)):
                 if q["question_text"].split()[0] in paragraphs[i].text:
@@ -175,17 +203,26 @@ def assign_image_flags(doc, exam_data):
                 continue
             current_index = start
 
-            # 문제 범위 추정 (해당 문단부터 5문단 내 이미지 확인)
-            q["question_has_image"] = any(idx in image_indices for idx in range(start, start + 5))
+            # 문제 이미지
+            for idx in range(start, start + 5):
+                if idx in image_indices:
+                    q["question_has_image"] = True
+                    img_url = upload_image_to_imgur(image_indices[idx])
+                    if img_url:
+                        q["question_image_url"] = img_url
+                    break
 
-            # 보기 이미지 매핑
+            # 선택지 이미지
             for ch in q["choices"]:
                 ch["has_image"] = False
+                ch["image_url"] = None
                 for idx in range(start, start + 5):
                     if ch["text"] in paragraphs[idx].text and idx in image_indices:
                         ch["has_image"] = True
+                        img_url = upload_image_to_imgur(image_indices[idx])
+                        if img_url:
+                            ch["image_url"] = img_url
                         break
-
 
 # 메인 실행
 def main(docx_path):
@@ -218,10 +255,15 @@ def main(docx_path):
     for subj in exam_data['subjects']:
         print(f"\n📘 {subj['subject_number']}과목: {subj['subject_name']}")
         print(f"총 {len(subj['questions'])}문제")
-        for q in subj['questions'][16:18]:
+        for q in subj['questions'][8:11]:
             print(f"  - {q['question_number']}번 문제: {q['question_text'][:60]}... (정답: {q['answer']}, 이미지: {'O' if q['question_has_image'] else 'X'})")
+            if q['question_image_url']:
+                print(f"    문제 이미지 URL: {q['question_image_url']}")
             for ch in q['choices']:
-                print(f"    {ch['number']} {ch['text'][:40]} (이미지: {'O' if ch['has_image'] else 'X'})")
+                if ch['has_image']:
+                    print(f"    {ch['number']} 이미지: {ch['image_url']}")
+                else:
+                    print(f"    {ch['number']} {ch['text'][:40]}")
     return exam_data
 
 if __name__ == "__main__":
