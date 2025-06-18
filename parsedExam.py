@@ -16,7 +16,14 @@ import base64
 import requests
 import time
 
-IMGUR_CLIENT_ID = "00ff8e726eb9eb8"
+IMGUR_CLIENT_IDS = ["6b9042903a1fea3", "a1608f84c2725a5"]
+current_imgur_index = 0  # 전역 변수
+
+def get_next_client_id():
+    global current_imgur_index
+    client_id = IMGUR_CLIENT_IDS[current_imgur_index]
+    current_imgur_index = (current_imgur_index + 1) % len(IMGUR_CLIENT_IDS)
+    return client_id
 
 def iter_block_items(parent):
     parent_elm = parent.element.body
@@ -34,30 +41,30 @@ def is_paragraph_in_table(paragraph: Paragraph):
         parent = parent.getparent()
     return False
 
-def upload_image_to_imgur(image_bytes):
-    try:
-        # 이미지 변환 (Pillow로 PNG 변환)
-        image = Image.open(BytesIO(image_bytes)).convert("RGB")
-        buffer = BytesIO()
-        image.save(buffer, format="PNG")
-        encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+# def upload_image_to_imgur(image_bytes):
+#     try:
+#         image = Image.open(BytesIO(image_bytes)).convert("RGB")
+#         buffer = BytesIO()
+#         image.save(buffer, format="PNG")
+#         encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-        headers = {"Authorization": f"Client-ID {IMGUR_CLIENT_ID}"}
-        data = {
-            'image': encoded,
-            'type': 'base64',
-            'name': 'upload.png',
-        }
-        response = requests.post("https://api.imgur.com/3/image", headers=headers, data=data)
-        if response.status_code == 200:
-            # print("✅ 이미지 업로드 성공", response.json()['data']['link'])
-            return response.json()['data']['link']
-        else:
-            print("❌ 업로드 실패:", response.status_code, response.text)
-            return None
-    except Exception as e:
-        print("❌ 이미지 처리 실패:", e)
-        return None
+#         client_id = get_next_client_id()
+#         headers = {"Authorization": f"Client-ID {client_id}"}
+#         data = {
+#             'image': encoded,
+#             'type': 'base64',
+#             'name': 'upload.png',
+#         }
+#         response = requests.post("https://api.imgur.com/3/image", headers=headers, data=data)
+#         if response.status_code == 200:
+#             # print("✅ 이미지 업로드 성공", response.json()['data']['link'])
+#             return response.json()['data']['link']
+#         else:
+#             print("❌ 업로드 실패:", response.status_code, response.text)
+#             return None
+#     except Exception as e:
+#         print("❌ 이미지 처리 실패:", e)
+#         return None
 
 def extract_image_url_from_paragraph(paragraph):
     for run in paragraph.runs:
@@ -75,12 +82,46 @@ def extract_image_url_from_paragraph(paragraph):
                 print(f"❌ rId {rId} not found in related_parts")
                 continue
             image_part = paragraph.part.related_parts[rId]
-            image_bytes = image_part.blob
+            image_bytes = image_part.blob 
             url = upload_image_to_imgur(image_bytes)
             print(f"✅ 이미지 업로드 성공: {url}")
-            time.sleep(360)
+            time.sleep(5)
             return url
     return None
+
+# 업로드 실패 시 대기 
+def upload_image_to_imgur(image_bytes, max_retries=3):
+    try:
+        image = Image.open(BytesIO(image_bytes)).convert("RGB")
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+        client_id = get_next_client_id()
+        headers = {"Authorization": f"Client-ID {client_id}"}
+        data = {'image': encoded, 'type': 'base64', 'name': 'upload.png'}
+
+        for attempt in range(1, max_retries + 1):
+            response = requests.post("https://api.imgur.com/3/image", headers=headers, data=data)
+            if response.status_code == 200:
+                url = response.json()['data']['link']
+                print(f"✅ 이미지 업로드 성공: {url}")
+                return url
+            elif response.status_code == 429:
+                print("🚫 업로드 제한 도달. 60초 대기 후 재시도...")
+                time.sleep(60)
+            elif response.status_code >= 500:
+                print(f"⚠️ 서버 오류 ({response.status_code}). {attempt}/{max_retries}회 재시도 중...")
+                time.sleep(5)
+            else:
+                print(f"❌ 업로드 실패: {response.status_code}\n{response.text}")
+                break
+
+    except Exception as e:
+        print("❌ 이미지 처리 오류:", e)
+
+    return None
+
 
 def extract_answer_map_from_table(table):
     answer_map = {}
@@ -150,8 +191,7 @@ def parse_exam_doc(doc_path):
                 if any("graphic" in run._element.xml for run in para.runs):
                     current_question["has_image"] = True
                     img_url = extract_image_url_from_paragraph(para)
-                    if img_url:
-                        current_question["image_url"] = img_url
+                    current_question["image_url"] = img_url if img_url else "UPLOAD_FAILED"
                     # if any("graphic" in run._element.xml for run in para.runs): # 이미지 업로드 잠시 중단
                     #     current_question["has_image"] = True
 
@@ -207,8 +247,6 @@ def process_all_exam_files(input_folder):
 
         for q in parsed_questions:
             current_qid = question_id_counter
-
-            print(cert_name, ": ", exam_date)
 
             all_questions.append({
                 "자격증명": cert_name,
