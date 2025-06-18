@@ -48,8 +48,59 @@ def replace_filled_numbers(paragraph, counter):
                 run.bold = False  # 굵기 제거
                 counter[0] += 1
 
-# <<<QUESTION>>> 및 [[[과목]]] 삽입
-def insert_question_and_subject_markers(doc):
+# <<<QUESTION>>> 삽입
+def insert_question_markers(paragraphs):
+    for p in paragraphs:
+        text = p.text.strip()
+        if not text:
+            continue
+        bold = any(run.bold for run in p.runs if run.text.strip())
+        if bold and re.match(r"^\d+\.\s", text):
+            insert_paragraph_before(p, "<<<QUESTION>>>")
+
+# 안내문 삭제
+def remove_cbt_notice(paragraphs):
+    start_idx, end_idx = None, None
+    for i, p in enumerate(paragraphs):
+        text = p.text.strip()
+        if start_idx is None and text.startswith("전자문제집 CBT"):
+            start_idx = i
+        if start_idx is not None and text.endswith("확인하세요."):
+            end_idx = i
+            break
+
+    if start_idx is not None and end_idx is not None:
+        for i in range(start_idx, end_idx + 1):
+            paragraphs[i]._element.getparent().remove(paragraphs[i]._element)
+        print(f"🗑️ 안내문 삭제 완료: 문단 {start_idx} ~ {end_idx}")
+    else:
+        print("⚠️ 안내문 텍스트를 찾지 못했습니다.")
+
+# 굵은 문단 수 세기 + (Bold) 표시
+def count_bold_paragraphs(paragraphs):
+    count = 0
+    for para in paragraphs:
+        if any(run.bold for run in para.runs if run.text.strip()):
+            para.add_run(" (Bold)")
+            count += 1
+    print(f"📝 굵은 글씨체 문단 수: {count}")
+
+# 메인 실행
+def main(path):
+    title, date = extract_title_info(path)
+    print(f"\n📄 문서: {os.path.basename(path)}")
+    doc = Document(path)
+
+    # ✅ 문단 리스트 추출
+    paragraphs = []
+    for b in iter_block_items(doc):
+        if isinstance(b, Paragraph):
+            paragraphs.append(b)
+
+    # 1. 안내문 삭제
+    remove_cbt_notice(paragraphs)
+
+    # 2. 문단 다시 추출 (삭제 후 반영)
     paragraphs = []
     for b in iter_block_items(doc):
         if isinstance(b, Paragraph):
@@ -62,50 +113,20 @@ def insert_question_and_subject_markers(doc):
 
     print(f"\n📄 전체 문단 수: {len(paragraphs)}")
 
+    # 3. 채워진 번호 변환
     counter = [0]
     for p in paragraphs:
-        text = p.text.strip()
-        if not text:
-            continue
-
-        # 채워진 번호 변환
         replace_filled_numbers(p, counter)
-
-        # 문제 번호 표시
-        bold = any(run.bold for run in p.runs if run.text.strip())
-        if bold and re.match(r"^\d+\.\s", text):
-            insert_paragraph_before(p, "<<<QUESTION>>>")
-
     print(f"✅ 숫자 변환: 총 {counter[0]}개")
 
-# 굵은 문단 수 세기
-def count_bold_paragraphs(paragraphs):
-    count = 0
-    for para in paragraphs:
-        if any(run.bold for run in para.runs if run.text.strip()):
-            para.add_run(" (Bold)")
-            count += 1
-    print(f"📝 굵은 글씨체 문단 수: {count}")
+    # 4. <<<QUESTION>>> 삽입
+    insert_question_markers(paragraphs)
 
-    
-
-# 메인 실행
-def main(path):
-    title, date = extract_title_info(path)
-    print(f"\n📄 문서: {os.path.basename(path)}")
-    doc = Document(path)
-    insert_question_and_subject_markers(doc)
-
-    # ✅ 문단 리스트 추출
-    paragraphs = []
-    for b in iter_block_items(doc):
-        if isinstance(b, Paragraph):
-            paragraphs.append(b)
-
-    # ✅ 굵기 문단 수 계산
+    # 5. 굵기 문단 수 세기
     count_bold_paragraphs(paragraphs)
 
-    output_path = f"marked3_{os.path.basename(path)}"
+    # 6. 저장
+    output_path = f"marked5_{os.path.basename(path)}"
     doc.save(output_path)
     print(f"✅ 저장 완료: {output_path}")
 
