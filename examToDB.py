@@ -37,20 +37,18 @@ def insert_paragraph_before(paragraph, text):
     return new_para
 
 # 채워진 번호를 비채워진 번호로 변환
-def replace_filled_numbers(paragraph):
+def replace_filled_numbers(paragraph, counter):
     filled_to_unfilled = {
         "❶": "①", "❷": "②", "❸": "③", "❹": "④",
     }
     for run in paragraph.runs:
-        original_text = run.text
         for filled, unfilled in filled_to_unfilled.items():
             if filled in run.text:
                 run.text = run.text.replace(filled, unfilled)
                 run.bold = False  # 굵기 제거
-        if original_text != run.text:
-            print(f"🔄 변환됨: '{original_text}' → '{run.text}'")
+                counter[0] += 1
 
-# <<<QUESTION>>> 삽입 + 숫자 변환
+# <<<QUESTION>>> 및 [[[과목]]] 삽입
 def insert_question_and_subject_markers(doc):
     paragraphs = []
     for b in iter_block_items(doc):
@@ -64,18 +62,32 @@ def insert_question_and_subject_markers(doc):
 
     print(f"\n📄 전체 문단 수: {len(paragraphs)}")
 
+    counter = [0]
     for p in paragraphs:
         text = p.text.strip()
         if not text:
             continue
 
-        # 채워진 숫자 → 비채워진 숫자 (굵기 제거 포함)
-        replace_filled_numbers(p)
+        # 채워진 번호 변환
+        replace_filled_numbers(p, counter)
 
         # 문제 번호 표시
         bold = any(run.bold for run in p.runs if run.text.strip())
         if bold and re.match(r"^\d+\.\s", text):
             insert_paragraph_before(p, "<<<QUESTION>>>")
+
+    print(f"✅ 숫자 변환: 총 {counter[0]}개")
+
+# 굵은 문단 수 세기
+def count_bold_paragraphs(paragraphs):
+    count = 0
+    for para in paragraphs:
+        if any(run.bold for run in para.runs if run.text.strip()):
+            para.add_run(" (Bold)")
+            count += 1
+    print(f"📝 굵은 글씨체 문단 수: {count}")
+
+    
 
 # 메인 실행
 def main(path):
@@ -83,6 +95,16 @@ def main(path):
     print(f"\n📄 문서: {os.path.basename(path)}")
     doc = Document(path)
     insert_question_and_subject_markers(doc)
+
+    # ✅ 문단 리스트 추출
+    paragraphs = []
+    for b in iter_block_items(doc):
+        if isinstance(b, Paragraph):
+            paragraphs.append(b)
+
+    # ✅ 굵기 문단 수 계산
+    count_bold_paragraphs(paragraphs)
+
     output_path = f"marked3_{os.path.basename(path)}"
     doc.save(output_path)
     print(f"✅ 저장 완료: {output_path}")
