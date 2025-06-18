@@ -124,6 +124,40 @@ def mark_bold_paragraphs(paragraphs):
     print(f"📝 굵은 글씨체 문단 수: {count}")
     print(f"📝 과목 수: {subject}")
 
+# 문제별 이미지 개수 확인
+def detect_images_by_question(doc):
+    paragraphs = [p for b in iter_block_items(doc) if isinstance(b, Paragraph) for p in [b]]
+    blocks = []
+    current = []
+    for para in paragraphs:
+        if para.text.strip() == "<<<QUESTION>>>":
+            if current:
+                blocks.append(current)
+            current = []
+        else:
+            current.append(para)
+    if current:
+        blocks.append(current)
+
+    image_results = []
+    for block in blocks:
+        question_number = None
+        image_count = 0
+        for para in block:
+            if question_number is None:
+                match = re.match(r"^(\d+)\.\s", para.text.strip())
+                if match:
+                    question_number = int(match.group(1))
+            for run in para.runs:
+                if "graphic" in run._element.xml:
+                    image_count += 1
+        if image_count:
+            image_results.append((question_number, image_count))
+
+    print("\n🖼️ 이미지 포함 문제:")
+    for qnum, cnt in image_results:
+        print(f"  - {qnum}번 문제: 이미지 {cnt}개")
+
 # 메인 실행
 def main(path):
     title, date = extract_title_info(path)
@@ -143,7 +177,10 @@ def main(path):
     # 굵은 글씨체 마킹
     mark_bold_paragraphs(paragraphs)
 
-    output_path = f"marked7_{os.path.basename(path)}"
+    # 이미지 포함 여부 확인
+    detect_images_by_question(doc)
+
+    output_path = f"marked8_{os.path.basename(path)}"
     doc.save(output_path)
     print(f"✅ 저장 완료: {output_path}")
 
