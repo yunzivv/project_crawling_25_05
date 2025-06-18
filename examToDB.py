@@ -279,7 +279,7 @@ def main(path):
     # 과목별 문제개수
     count_questions_in_subject(doc)
 
-    output_path = f"marked00_{os.path.basename(path)}"
+    output_path = f"{os.path.basename(path)}"
     doc.save(output_path)
     print(f"✅ 저장 완료: {output_path}")
 
@@ -291,5 +291,39 @@ def main(path):
         for num, content in q['choices']:
             print(f"  {num}. {content}")
 
+# 전체 반복
+INPUT_FOLDER = "기출문제Docx"
+OUTPUT_FOLDER = "기출문제포맷"
+
+def batch_format_documents():
+    if not os.path.exists(OUTPUT_FOLDER):
+        os.makedirs(OUTPUT_FOLDER)
+
+    files = [f for f in os.listdir(INPUT_FOLDER) if f.endswith(".docx")]
+    print(f"📁 총 {len(files)}개 파일 처리 시작")
+
+    for idx, filename in enumerate(files, 1):
+        input_path = os.path.join(INPUT_FOLDER, filename)
+        output_path = os.path.join(OUTPUT_FOLDER, filename)
+        try:
+            print(f"\n[{idx}/{len(files)}] ▶ 처리 중: {filename}")
+            process_single_file(input_path, output_path)
+        except Exception as e:
+            print(f"❌ 오류 발생 - {filename}: {e}")
+
+def process_single_file(input_path, output_path):
+    title, date = extract_title_info(input_path)
+    doc = Document(input_path)
+
+    all_paragraphs = [p for b in iter_block_items(doc) if isinstance(b, Paragraph) for p in [b]]
+    remove_cbt_notice(all_paragraphs)
+    convert_subject_tables(doc)
+    insert_question_and_convert(doc)
+    split_choice_paragraphs(doc)
+    count_questions_in_subject(doc)
+
+    doc.save(output_path)
+    print(f"✅ 저장 완료: {output_path}")
+
 if __name__ == "__main__":
-    main("가스기사20200606.docx")
+    batch_format_documents()

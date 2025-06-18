@@ -27,7 +27,7 @@ headers = {
 
 # AI·개발·데이터 > 웹개발자 완료 1795
 dutyCtgr = "10031"
-duty = "1000240"
+duty = "1000242"
 
 payload = {
     "condition": {
@@ -38,9 +38,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 800,
-    "Page": 2,
-    "PageSize": 400
+    "TotalCount": 456,
+    "Page": 1,
+    "PageSize": 230
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
