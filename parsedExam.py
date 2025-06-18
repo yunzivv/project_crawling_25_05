@@ -14,6 +14,7 @@ from PIL import Image
 from io import BytesIO
 import base64
 import requests
+import time
 
 IMGUR_CLIENT_ID = "00ff8e726eb9eb8"
 
@@ -77,6 +78,7 @@ def extract_image_url_from_paragraph(paragraph):
             image_bytes = image_part.blob
             url = upload_image_to_imgur(image_bytes)
             print(f"✅ 이미지 업로드 성공: {url}")
+            time.sleep(360)
             return url
     return None
 
@@ -147,11 +149,11 @@ def parse_exam_doc(doc_path):
 
                 if any("graphic" in run._element.xml for run in para.runs):
                     current_question["has_image"] = True
-                    # img_url = extract_image_url_from_paragraph(para)  # 이미지 업로드 잠시 중단
-                    # if img_url:
-                    #     current_question["image_url"] = img_url
-                    if any("graphic" in run._element.xml for run in para.runs): # 이미지 업로드 잠시 중단
-                        current_question["has_image"] = True
+                    img_url = extract_image_url_from_paragraph(para)
+                    if img_url:
+                        current_question["image_url"] = img_url
+                    # if any("graphic" in run._element.xml for run in para.runs): # 이미지 업로드 잠시 중단
+                    #     current_question["has_image"] = True
 
 
         if "[choice]" in text or text.startswith(("①", "②", "③", "④")):
@@ -191,10 +193,26 @@ def process_all_exam_files(input_folder):
         print(filename)
         parsed_questions = parse_exam_doc(filepath)
 
+        # 시험명과 날짜 추출 (예: '가스기사20200606' → '가스기사', '20200606')
+        basename = os.path.splitext(filename)[0]
+        match = re.match(r"([^\d]+)(\d{8})", basename)
+        if match:
+            cert_name = match.group(1)
+            exam_date = match.group(2)
+        else:
+            cert_name = ""
+            exam_date = ""
+
+        print(f"▶️ 현재 파일: {filename}, 자격증명: {cert_name}, 시험일자: {exam_date}, 문제 수: {len(parsed_questions)}")
+
         for q in parsed_questions:
             current_qid = question_id_counter
 
+            print(cert_name, ": ", exam_date)
+
             all_questions.append({
+                "자격증명": cert_name,
+                "시험일자": exam_date,
                 "시험ID": exam_id,
                 "문제ID": current_qid,
                 "과목번호": q["subject_number"],
@@ -202,11 +220,13 @@ def process_all_exam_files(input_folder):
                 "문제번호": q["question_number"],
                 "문제텍스트": q["question_text"].strip(),
                 "이미지포함": "true" if q["has_image"] else "false",
-                "이미지URL": "" # 원래: q["image_url"] or ""
+                "이미지URL": q["image_url"] or ""
             })
 
             for num, text, is_correct in q["choices"]:
                 all_choices.append({
+                    "자격증명": cert_name,
+                    "시험일자": exam_date,
                     "시험ID": exam_id,
                     "문제ID": current_qid,
                     "선택지번호": num,
@@ -224,6 +244,7 @@ def process_all_exam_files(input_folder):
     df_questions.to_excel("questions.xlsx", index=False)
     df_choices.to_excel("choices.xlsx", index=False)
     print("✅ 전체 시험 Excel 저장 완료: questions.xlsx, choices.xlsx")
+
 
 if __name__ == "__main__":
     process_all_exam_files("기출문제포맷")    
