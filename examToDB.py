@@ -21,19 +21,6 @@ def iter_block_items(parent):
         elif isinstance(child, CT_Tbl):
             yield Table(child, parent)
 
-# 표 추출 함수
-def get_all_paragraphs(doc):
-    paragraphs = []
-    for b in iter_block_items(doc):
-        if isinstance(b, Paragraph):
-            paragraphs.append(b)
-        elif isinstance(b, Table):
-            for row in b.rows:
-                for cell in row.cells:
-                    for para in cell.paragraphs:
-                        paragraphs.append(para)
-    return paragraphs
-
 # 표 안 여부 확인 함수
 def is_paragraph_in_table(paragraph: Paragraph):
     parent = paragraph._element
@@ -134,33 +121,6 @@ def insert_question_and_convert(doc):
     print(f"✅ 숫자 변환: 총 {counter[0]}개")
     return paragraphs
 
-# 선택지 포맷
-def format_choices_in_paragraphs(doc):
-    paragraphs = get_all_paragraphs(doc)
-    modified_count = 0
-
-    for para in paragraphs:
-        if is_paragraph_in_table(para):
-            continue  # 표 안은 제외
-
-        for run in para.runs:
-            text = run.text
-            original = text
-
-            # ① 앞에 [choice]\n 삽입
-            text = text.replace("①", "[choice]\n①")
-
-            # ②, ④ 앞에 개행 삽입 (공백 1개 이상인 경우)
-            for mark in ["②", "④"]:
-                # 공백이 하나 이상 + 해당 번호가 있는 경우 => 개행 삽입
-                text = re.sub(rf"[ \t\u2002\u2003\u3000]+{mark}", f"\n{mark}", text)
-
-            if text != original:
-                run.text = text
-                modified_count += 1
-
-    print(f"🛠️ 선택지 형식 수정 완료: {modified_count}개 문단 수정됨")
-
 # 선택지를 개별 문단으로 분리하고 마킹
 def split_choice_paragraphs(doc):
     pattern = r"(①|②|③|④)"
@@ -174,6 +134,9 @@ def split_choice_paragraphs(doc):
         if not any(opt in full_text for opt in ["①", "②", "③", "④"]):
             continue
 
+        # ① 앞에 [choice]\n 삽입
+        full_text = full_text.replace("①", "[choice]\n①")
+        
         # 선택지 번호 앞에 개행 삽입
         split_text = re.sub(pattern, r"\n\1", full_text)
 
@@ -199,57 +162,8 @@ def split_choice_paragraphs(doc):
 
     print("✅ 선택지를 문단 단위로 완전히 분리 완료")
 
-    
-# 굵은 문단 표시 (과목과 문제용)
-def mark_bold_paragraphs(paragraphs):
-    count = 0
-    subject = 0
-    for para in paragraphs:
-        text = para.text.strip()
-        if text.startswith("(Subject)") and text.endswith("(Subject)"):
-            subject += 1
-        elif any(run.bold for run in para.runs if run.text.strip()):
-            para.add_run(" (Bold)")
-            count += 1
-    print(f"📝 굵은 글씨체 문단 수: {count}")
-    print(f"📝 과목 수: {subject}")
-
-# 문제별 이미지 개수 확인
-def detect_images_by_question(doc):
-    paragraphs = [p for b in iter_block_items(doc) if isinstance(b, Paragraph) for p in [b]]
-    blocks = []
-    current = []
-    for para in paragraphs:
-        if para.text.strip() == "<<<QUESTION>>>":
-            if current:
-                blocks.append(current)
-            current = []
-        else:
-            current.append(para)
-    if current:
-        blocks.append(current)
-
-    image_results = []
-    for block in blocks:
-        question_number = None
-        image_count = 0
-        for para in block:
-            if question_number is None:
-                match = re.match(r"^(\d+)\.\s", para.text.strip())
-                if match:
-                    question_number = int(match.group(1))
-            for run in para.runs:
-                if "graphic" in run._element.xml:
-                    image_count += 1
-        if image_count:
-            image_results.append((question_number, image_count))
-
-    print("\n🖼️ 이미지 포함 문제:")
-    for qnum, cnt in image_results:
-        print(f"  - {qnum}번 문제: 이미지 {cnt}개")
-
-
-def count_questions_per_subject_by_order(doc):
+# 과목별 문제 개수 
+def count_questions_in_subject(doc):
     subject_counts = {}
     current_subject = None
     current_count = 0
@@ -279,25 +193,22 @@ def count_questions_per_subject_by_order(doc):
     for subject, count in subject_counts.items():
         print(f"  - {subject}: {count}문제")
 
+# 문제, 선택지 분류
 def parse_questions_and_choices(doc: Document):
     paragraphs = doc.paragraphs
     questions = []
-    blocks = []
     current_block = []
-
+    
+    # 블록을 문제 단위로 나누기
     for para in paragraphs:
         if para.text.strip() == "<<<QUESTION>>>":
             if current_block:
-                blocks.append(current_block)
+                questions.append(current_block)
             current_block = []
         else:
             current_block.append(para)
-
     if current_block:
-        blocks.append(current_block)
-
-    # ✅ 첫 블록 무시
-    blocks = blocks[1:]
+        questions.append(current_block)
 
     parsed = []
     for block in questions:
@@ -365,19 +276,10 @@ def main(path):
     # 선택지 문단 분리
     split_choice_paragraphs(doc)
 
-    # 굵은 글씨체 마킹
-    # mark_bold_paragraphs(paragraphs)
-
-    # 선택지 포맷
-    # format_choices_in_paragraphs(doc)
-
-    # 이미지 포함 여부 확인
-    # detect_images_by_question(doc)
-
     # 과목별 문제개수
-    count_questions_per_subject_by_order(doc)
+    count_questions_in_subject(doc)
 
-    output_path = f"marked12_{os.path.basename(path)}"
+    output_path = f"marked00_{os.path.basename(path)}"
     doc.save(output_path)
     print(f"✅ 저장 완료: {output_path}")
 
