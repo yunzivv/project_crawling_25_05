@@ -294,6 +294,68 @@ def count_questions_per_subject_by_order(doc):
     for subject, count in subject_counts.items():
         print(f"  - {subject}: {count}문제")
 
+def parse_questions_and_choices(doc: Document):
+    paragraphs = doc.paragraphs
+    questions = []
+    current_block = []
+    
+    # 블록을 문제 단위로 나누기
+    for para in paragraphs:
+        if para.text.strip() == "<<<QUESTION>>>":
+            if current_block:
+                questions.append(current_block)
+            current_block = []
+        else:
+            current_block.append(para)
+    if current_block:
+        questions.append(current_block)
+
+    parsed = []
+    for block in questions:
+        question_number = None
+        question_text = ""
+        has_image = False
+        choices = []
+
+        for para in block:
+            text = para.text.strip()
+
+            # 문제 번호 추출
+            if question_number is None:
+                match = re.match(r"^(\d+)\.\s*", text)
+                if match:
+                    question_number = int(match.group(1))
+
+            # 이미지 포함 여부
+            if not has_image:
+                has_image = any("graphic" in run._element.xml for run in para.runs)
+
+            # 선택지 추출
+            if "[choice]" in text:
+                # 번호 매핑
+                for run in para.runs:
+                    choice_text = run.text.strip()
+                    if not choice_text:
+                        continue
+                    match = re.match(r"\[choice\]\s*(①|②|③|④)(.*)", choice_text)
+                    if match:
+                        choice_number = "①②③④".index(match.group(1)) + 1
+                        choice_body = match.group(2).strip()
+                        if choice_body:  # 텍스트 없는 경우 제외
+                            choices.append((choice_number, choice_body))
+
+            # 문제 텍스트 축적
+            elif re.match(r"^\d+\.\s", text):  # 문제 본문
+                question_text = text
+
+        parsed.append({
+            "number": question_number,
+            "text": question_text,
+            "has_image": has_image,
+            "choices": choices
+        })
+
+    return parsed
 
 # 메인 실행
 def main(path):
@@ -315,7 +377,7 @@ def main(path):
     split_choice_paragraphs(doc)
 
     # 굵은 글씨체 마킹
-    mark_bold_paragraphs(paragraphs)
+    # mark_bold_paragraphs(paragraphs)
 
     # 문제 포맷
     # format_choices_in_paragraphs(doc)
@@ -326,9 +388,17 @@ def main(path):
     # 과목별 문제개수
     count_questions_per_subject_by_order(doc)
 
-    output_path = f"marked11_{os.path.basename(path)}"
+    output_path = f"marked12_{os.path.basename(path)}"
     doc.save(output_path)
     print(f"✅ 저장 완료: {output_path}")
+
+    data = parse_questions_and_choices(doc)
+
+    for q in data[:6]:  # 처음 5문제만 출력 예시
+        print(f"\n문제 {q['number']}: {q['text']}")
+        print(f"이미지 포함: {'✅' if q['has_image'] else '❌'}")
+        for num, content in q['choices']:
+            print(f"  {num}. {content}")
 
 if __name__ == "__main__":
     main("가스기사20200606.docx")
