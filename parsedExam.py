@@ -179,33 +179,52 @@ def parse_exam_doc(doc_path):
 
     return results
 
-if __name__ == "__main__":
-    docx_path = "marked00_가스기사20200606.docx"
-    parsed = parse_exam_doc(docx_path)
-    
+def process_all_exam_files(input_folder):
+    all_questions = []
+    all_choices = []
 
-    df_questions = pd.DataFrame([
-        {
-            "과목번호": q["subject_number"],
-            "과목명": q["subject"],
-            "문제번호": q["question_number"],
-            "문제텍스트": q["question_text"].strip(),
-            "이미지포함": "true" if q["has_image"] else "false",
-            "이미지URL": q["image_url"] or ""
-        }
-        for q in parsed
-    ])
+    exam_id = 1
+    question_id_counter = 1
 
-    df_choices = pd.DataFrame([
-        {
-            "문제번호": q["question_number"],
-            "선택지번호": num,
-            "선택지내용": text,
-            "정답여부": "true" if is_correct else "false"
-        }
-        for q in parsed for num, text, is_correct in q["choices"]
-    ])
+    filenames = sorted([f for f in os.listdir(input_folder) if f.endswith('.docx')])
+
+    for filename in filenames:
+        filepath = os.path.join(input_folder, filename)
+        parsed_questions = parse_exam_doc(filepath)
+
+        for q in parsed_questions:
+            current_qid = question_id_counter
+
+            all_questions.append({
+                "시험ID": exam_id,
+                "문제ID": current_qid,
+                "과목번호": q["subject_number"],
+                "과목명": q["subject"],
+                "문제번호": q["question_number"],
+                "문제텍스트": q["question_text"].strip(),
+                "이미지포함": "true" if q["has_image"] else "false",
+                "이미지URL": q["image_url"] or ""
+            })
+
+            for num, text, is_correct in q["choices"]:
+                all_choices.append({
+                    "시험ID": exam_id,
+                    "문제ID": current_qid,
+                    "선택지번호": num,
+                    "선택지내용": text,
+                    "정답여부": "true" if is_correct else "false"
+                })
+
+            question_id_counter += 1
+
+        exam_id += 1
+
+    df_questions = pd.DataFrame(all_questions)
+    df_choices = pd.DataFrame(all_choices)
 
     df_questions.to_excel("questions.xlsx", index=False)
     df_choices.to_excel("choices.xlsx", index=False)
-    print("✅ Excel 저장 완료: questions.xlsx, choices.xlsx")
+    print("✅ 전체 시험 Excel 저장 완료: questions.xlsx, choices.xlsx")
+
+if __name__ == "__main__":
+    process_all_exam_files("기출문제포맷")    
