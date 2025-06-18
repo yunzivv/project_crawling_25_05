@@ -163,57 +163,41 @@ def format_choices_in_paragraphs(doc):
 
 # 선택지를 개별 문단으로 분리하고 마킹
 def split_choice_paragraphs(doc):
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-    from copy import deepcopy
-
-    body = doc._element.body
+    pattern = r"(①|②|③|④)"
+    new_paragraphs = []
 
     for paragraph in list(doc.paragraphs):
         if is_paragraph_in_table(paragraph):
             continue
 
-        full_text = "".join(run.text for run in paragraph.runs)
+        full_text = paragraph.text
         if not any(opt in full_text for opt in ["①", "②", "③", "④"]):
             continue
 
-        # 개행 삽입
-        full_text = re.sub(r"\s*(①)", r"\n[choice]\n\1", full_text)
-        full_text = re.sub(r"\s{2,}(②)", r"\n\1", full_text)
-        full_text = re.sub(r"\s{2,}(③)", r"\n\1", full_text)
-        full_text = re.sub(r"\s{2,}(④)", r"\n\1", full_text)
+        # 선택지 번호 앞에 개행 삽입
+        split_text = re.sub(pattern, r"\n\1", full_text)
 
-        # 라인 분리
-        lines = [line.strip() for line in full_text.split("\n") if line.strip()]
+        # 문장 분리
+        lines = [line.strip() for line in split_text.split('\n') if line.strip()]
         if len(lines) <= 1:
             continue
 
-        # 기존 run 복사
-        original_runs = paragraph.runs
-        run_elements = [deepcopy(run._element) for run in original_runs]
-
-        # 원본 제거
+        # 원래 문단 삭제
         parent_elm = paragraph._element.getparent()
         insert_idx = list(parent_elm).index(paragraph._element)
         parent_elm.remove(paragraph._element)
 
-        # 새 문단 생성 (기존 run 유지)
+        # 새 문단들 삽입
         for i, line in enumerate(lines):
             new_p = OxmlElement("w:p")
-            new_para = Paragraph(new_p, doc)
-            new_runs = deepcopy(run_elements)
-
-            # 텍스트만 대체
-            for r in new_runs:
-                for t in r.iter(qn("w:t")):
-                    t.text = line
-                    break  # 하나만 교체
-                new_p.append(r)
-                break  # 하나의 run만 유지
-
+            r = OxmlElement("w:r")
+            t = OxmlElement("w:t")
+            t.text = line
+            r.append(t)
+            new_p.append(r)
             parent_elm.insert(insert_idx + i, new_p)
 
-    print("✅ 선택지를 문단 단위로 분리 완료 (이미지 보존)")
+    print("✅ 선택지를 문단 단위로 완전히 분리 완료")
 
     
 # 굵은 문단 표시 (과목과 문제용)
@@ -264,6 +248,7 @@ def detect_images_by_question(doc):
     for qnum, cnt in image_results:
         print(f"  - {qnum}번 문제: 이미지 {cnt}개")
 
+
 def count_questions_per_subject_by_order(doc):
     subject_counts = {}
     current_subject = None
@@ -297,18 +282,22 @@ def count_questions_per_subject_by_order(doc):
 def parse_questions_and_choices(doc: Document):
     paragraphs = doc.paragraphs
     questions = []
+    blocks = []
     current_block = []
-    
-    # 블록을 문제 단위로 나누기
+
     for para in paragraphs:
         if para.text.strip() == "<<<QUESTION>>>":
             if current_block:
-                questions.append(current_block)
+                blocks.append(current_block)
             current_block = []
         else:
             current_block.append(para)
+
     if current_block:
-        questions.append(current_block)
+        blocks.append(current_block)
+
+    # ✅ 첫 블록 무시
+    blocks = blocks[1:]
 
     parsed = []
     for block in questions:
@@ -379,11 +368,11 @@ def main(path):
     # 굵은 글씨체 마킹
     # mark_bold_paragraphs(paragraphs)
 
-    # 문제 포맷
+    # 선택지 포맷
     # format_choices_in_paragraphs(doc)
 
     # 이미지 포함 여부 확인
-    detect_images_by_question(doc)
+    # detect_images_by_question(doc)
 
     # 과목별 문제개수
     count_questions_per_subject_by_order(doc)
