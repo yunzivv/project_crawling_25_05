@@ -1,3 +1,6 @@
+# ocr-env_examToDB\Scripts\activate
+# python parsedExam.py
+
 import re
 import os
 import pandas as pd
@@ -7,7 +10,9 @@ from docx.oxml.table import CT_Tbl
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 import pyimgur
+from PIL import Image
 from io import BytesIO
+import base64
 import requests
 
 IMGUR_CLIENT_ID = "00ff8e726eb9eb8"
@@ -28,24 +33,34 @@ def is_paragraph_in_table(paragraph: Paragraph):
         parent = parent.getparent()
     return False
 
-def upload_image_to_imgur(image_bytes, ext):
-    headers = {"Authorization": f"Client-ID {IMGUR_CLIENT_ID}"}
-    data = {"image": image_bytes}
-    response = requests.post("https://api.imgur.com/3/image", headers=headers, files={"image": image_bytes})
-    
-    if response.status_code == 200:
-        link = response.json()["data"]["link"]
-        print("✅ 업로드 성공:", link)
-        return link
-    else:
-        print("❌ 업로드 실패:", response.status_code, response.text)
+def upload_image_to_imgur(image_bytes):
+    try:
+        # 이미지 변환 (Pillow로 PNG 변환)
+        image = Image.open(BytesIO(image_bytes)).convert("RGB")
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+        headers = {"Authorization": f"Client-ID {IMGUR_CLIENT_ID}"}
+        data = {
+            'image': encoded,
+            'type': 'base64',
+            'name': 'upload.png',
+        }
+        response = requests.post("https://api.imgur.com/3/image", headers=headers, data=data)
+        if response.status_code == 200:
+            # print("✅ 이미지 업로드 성공", response.json()['data']['link'])
+            return response.json()['data']['link']
+        else:
+            print("❌ 업로드 실패:", response.status_code, response.text)
+            return None
+    except Exception as e:
+        print("❌ 이미지 처리 실패:", e)
         return None
-    
-# 이미지 파일 테스트
-with open("test_image.png", "rb") as f:
-    img_bytes = f.read()
-    url = upload_image_to_imgur(img_bytes, ext=".png")
-    print("✅ 업로드 URL:", url)
+
+with open("test_image.jpg", "rb") as f:
+    url = upload_image_to_imgur(f.read())
+    print("✅ 업로드된 URL:", url)
 
 def extract_image_url_from_paragraph(paragraph):
     for run in paragraph.runs:
@@ -64,12 +79,10 @@ def extract_image_url_from_paragraph(paragraph):
                 continue
             image_part = paragraph.part.related_parts[rId]
             image_bytes = image_part.blob
-            url = upload_image_to_imgur(image_bytes, ext=".png")
+            url = upload_image_to_imgur(image_bytes)
             print(f"✅ 이미지 업로드 성공: {url}")
             return url
     return None
-
-
 
 def extract_answer_map_from_table(table):
     answer_map = {}
@@ -138,6 +151,9 @@ def parse_exam_doc(doc_path):
 
                 if any("graphic" in run._element.xml for run in para.runs):
                     current_question["has_image"] = True
+                    img_url = extract_image_url_from_paragraph(para)  # ⬅ 이 줄 추가
+                    if img_url:
+                        current_question["image_url"] = img_url
 
 
         if "[choice]" in text or text.startswith(("①", "②", "③", "④")):
