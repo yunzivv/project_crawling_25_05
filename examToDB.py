@@ -36,8 +36,21 @@ def insert_paragraph_before(paragraph, text):
     new_para.add_run(text)
     return new_para
 
-# <<<QUESTION>>> 삽입
+# 채워진 번호를 비채워진 번호로 변환
+def replace_filled_numbers(paragraph):
+    filled_to_unfilled = {
+        "❶": "①", "❷": "②", "❸": "③", "❹": "④",
+    }
+    for run in paragraph.runs:
+        original_text = run.text
+        for filled, unfilled in filled_to_unfilled.items():
+            if filled in run.text:
+                run.text = run.text.replace(filled, unfilled)
+                run.bold = False  # 굵기 제거
+        if original_text != run.text:
+            print(f"🔄 변환됨: '{original_text}' → '{run.text}'")
 
+# <<<QUESTION>>> 삽입 + 숫자 변환
 def insert_question_and_subject_markers(doc):
     paragraphs = []
     for b in iter_block_items(doc):
@@ -56,21 +69,21 @@ def insert_question_and_subject_markers(doc):
         if not text:
             continue
 
+        # 채워진 숫자 → 비채워진 숫자 (굵기 제거 포함)
+        replace_filled_numbers(p)
+
         # 문제 번호 표시
         bold = any(run.bold for run in p.runs if run.text.strip())
         if bold and re.match(r"^\d+\.\s", text):
             insert_paragraph_before(p, "<<<QUESTION>>>")
 
-
-
 # 메인 실행
-
 def main(path):
     title, date = extract_title_info(path)
     print(f"\n📄 문서: {os.path.basename(path)}")
     doc = Document(path)
     insert_question_and_subject_markers(doc)
-    output_path = f"marked2_{os.path.basename(path)}"
+    output_path = f"marked3_{os.path.basename(path)}"
     doc.save(output_path)
     print(f"✅ 저장 완료: {output_path}")
 
