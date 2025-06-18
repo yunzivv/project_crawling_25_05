@@ -25,6 +25,42 @@ def is_paragraph_in_table(paragraph: Paragraph):
         parent = parent.getparent()
     return False
 
+def extract_answer_map_from_table(table):
+    CHOICE_MAP = {"①": 1, "②": 2, "③": 3, "④": 4}
+    answer_map = {}
+    rows = table.rows
+    for i in range(0, len(rows), 2):  # 두 행씩 묶기
+        if i + 1 >= len(rows):
+            break  # 짝이 안 맞는 경우 방지
+
+        number_cells = rows[i].cells
+        answer_cells = rows[i + 1].cells
+
+        for nc, ac in zip(number_cells, answer_cells):
+            qnum_text = nc.text.strip()
+            print(qnum_text)
+            ans_text = ac.text.strip()
+            print(ans_text)
+
+            if not qnum_text:
+                continue
+
+            match = re.search(r"\d+", qnum_text)
+            if not match:
+                continue
+            qnum = int(match.group())
+
+            if ans_text in CHOICE_MAP:
+                answer_map[qnum] = CHOICE_MAP[ans_text]
+            else:
+                try:
+                    answer_map[qnum] = int(ans_text)
+                except ValueError:
+                    continue  # 정답값이 이상한 경우 skip
+
+    return answer_map
+
+
 # 정답표 추출 함수 (마지막 표)
 def extract_answer_map(doc):
     tables = [tbl for tbl in iter_block_items(doc) if isinstance(tbl, Table)]
@@ -52,7 +88,7 @@ def extract_answer_map(doc):
 def parse_exam_doc(doc_path):
     doc = Document(doc_path)
     paragraphs = [p for p in iter_block_items(doc) if isinstance(p, Paragraph)]
-    answer_map = extract_answer_map(doc)
+    answer_map = extract_answer_map_from_table(doc.tables[-1])  # 마지막 표가 정답표
 
     results = []
     current_subject = None
@@ -63,7 +99,7 @@ def parse_exam_doc(doc_path):
     for para in paragraphs:
         text = para.text.strip()
 
-        # 과목 처리
+        # 과목
         if text.startswith("(Subject)") and text.endswith("(Subject)"):
             subject_content = text.replace("(Subject)", "").strip()
             match = re.match(r"(\d+과목)\s*:\s*(.+)", subject_content)
@@ -121,8 +157,14 @@ def parse_exam_doc(doc_path):
     for q in results:
         qnum = q["question_number"]
         q["answer_number"] = answer_map.get(qnum)
+        new_choices = []
+        for num, text in q["choices"]:
+            is_correct = (num == q["answer_number"])
+            new_choices.append((num, text, is_correct))
+        q["choices"] = new_choices
 
     return results
+
 
 # 실행
 docx_path = "marked00_가스기사20200606.docx"
@@ -134,13 +176,13 @@ df = pd.DataFrame([
         "과목명": q["subject"],
         "문제번호": q["question_number"],
         "문제텍스트": q["question_text"].strip(),
-        "이미지포함": "✅" if q["has_image"] else "❌",
+        "이미지포함": "true" if q["has_image"] else "false",
         "선택지번호": num,
         "선택지내용": text,
         "정답번호": q["answer_number"],
-        "정답여부": "⭕" if num == q["answer_number"] else "❌"
+        "정답여부": "true" if is_correct else "false"
     }
-    for q in parsed_data for num, text in q["choices"]
+    for q in parsed_data for num, text, is_correct in q["choices"]
 ])
 
 df.to_excel("parsed_exam.xlsx", index=False)
