@@ -19,6 +19,28 @@ def iter_block_items(parent):
         elif isinstance(child, CT_Tbl):
             yield Table(child, parent)
 
+# 표 추출 함수
+def get_all_paragraphs(doc):
+    paragraphs = []
+    for b in iter_block_items(doc):
+        if isinstance(b, Paragraph):
+            paragraphs.append(b)
+        elif isinstance(b, Table):
+            for row in b.rows:
+                for cell in row.cells:
+                    for para in cell.paragraphs:
+                        paragraphs.append(para)
+    return paragraphs
+
+# 표 안 여부 확인 함수
+def is_paragraph_in_table(paragraph: Paragraph):
+    parent = paragraph._element
+    while parent is not None:
+        if parent.tag.endswith("tbl"):
+            return True
+        parent = parent.getparent()
+    return False
+
 # 제목 정보 추출
 def extract_title_info(filename):
     basename = os.path.basename(filename)
@@ -110,6 +132,71 @@ def insert_question_and_convert(doc):
     print(f"✅ 숫자 변환: 총 {counter[0]}개")
     return paragraphs
 
+# 선택지 포맷
+def format_choices_in_paragraphs(doc):
+    paragraphs = get_all_paragraphs(doc)
+    modified_count = 0
+
+    for para in paragraphs:
+        if is_paragraph_in_table(para):
+            continue  # 표 안은 제외
+
+        for run in para.runs:
+            text = run.text
+            original = text
+
+            # ① 앞에 [choice]\n 삽입
+            text = text.replace("①", "[choice]\n①")
+
+            # ②, ④ 앞에 개행 삽입 (공백 1개 이상인 경우)
+            for mark in ["②", "④"]:
+                # 공백이 하나 이상 + 해당 번호가 있는 경우 => 개행 삽입
+                text = re.sub(rf"[ \t\u2002\u2003\u3000]+{mark}", f"\n{mark}", text)
+
+            if text != original:
+                run.text = text
+                modified_count += 1
+
+    print(f"🛠️ 선택지 형식 수정 완료: {modified_count}개 문단 수정됨")
+
+# 선택지를 개별 문단으로 분리하고 마킹
+def split_choice_paragraphs(doc):
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    body = doc._element.body
+    new_elements = []
+
+    for paragraph in list(doc.paragraphs):
+        if is_paragraph_in_table(paragraph):
+            continue
+
+        text = paragraph.text
+        # 선택지 번호 앞에 개행을 강제로 넣고 정리
+        text = re.sub(r"\s*(①)", r"\n[choice]\n\1", text)
+        text = re.sub(r"\s{2,}(②)", r"\n\1", text)
+        text = re.sub(r"\s{2,}(③)", r"\n\1", text)
+        text = re.sub(r"\s{2,}(④)", r"\n\1", text)
+
+        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        if len(lines) <= 1:
+            continue  # 변경 필요 없음
+
+        # 새 문단 생성
+        parent_elm = paragraph._element.getparent()
+        insert_idx = list(parent_elm).index(paragraph._element)
+        for idx, line in enumerate(lines):
+            p = OxmlElement("w:p")
+            r = OxmlElement("w:r")
+            t = OxmlElement("w:t")
+            t.text = line
+            r.append(t)
+            p.append(r)
+            parent_elm.insert(insert_idx + idx, p)
+        parent_elm.remove(paragraph._element)
+
+    print("✅ 선택지를 문단 단위로 분리 완료")
+    
 # 굵은 문단 표시 (과목과 문제용)
 def mark_bold_paragraphs(paragraphs):
     count = 0
@@ -174,13 +261,19 @@ def main(path):
     # 문제 마킹 및 숫자 변환
     paragraphs = insert_question_and_convert(doc)
 
+    # 선택지 문단 분리
+    split_choice_paragraphs(doc)
+
     # 굵은 글씨체 마킹
     mark_bold_paragraphs(paragraphs)
+
+    # 문제 포맷
+    # format_choices_in_paragraphs(doc)
 
     # 이미지 포함 여부 확인
     detect_images_by_question(doc)
 
-    output_path = f"marked8_{os.path.basename(path)}"
+    output_path = f"marked9_{os.path.basename(path)}"
     doc.save(output_path)
     print(f"✅ 저장 완료: {output_path}")
 
