@@ -264,6 +264,37 @@ def detect_images_by_question(doc):
     for qnum, cnt in image_results:
         print(f"  - {qnum}번 문제: 이미지 {cnt}개")
 
+def count_questions_per_subject_by_order(doc):
+    subject_counts = {}
+    current_subject = None
+    current_count = 0
+    subject_index = 1
+
+    for block in iter_block_items(doc):
+        if isinstance(block, Paragraph):
+            text = block.text.strip()
+
+            # 과목 발견
+            if text.startswith("(Subject)") and text.endswith("(Subject)"):
+                if current_subject:
+                    subject_counts[f"{subject_index}과목 : {current_subject}"] = current_count
+                    subject_index += 1
+                current_subject = text.replace("(Subject)", "").strip()
+                current_count = 0
+
+            # 문제 마커 발견
+            elif text == "<<<QUESTION>>>":
+                current_count += 1
+
+    # 마지막 과목 저장
+    if current_subject:
+        subject_counts[f"{subject_index}과목 : {current_subject}"] = current_count
+
+    print("\n📊 과목별 문제 개수:")
+    for subject, count in subject_counts.items():
+        print(f"  - {subject}: {count}문제")
+
+
 # 메인 실행
 def main(path):
     title, date = extract_title_info(path)
@@ -292,7 +323,10 @@ def main(path):
     # 이미지 포함 여부 확인
     detect_images_by_question(doc)
 
-    output_path = f"marked10_{os.path.basename(path)}"
+    # 과목별 문제개수
+    count_questions_per_subject_by_order(doc)
+
+    output_path = f"marked11_{os.path.basename(path)}"
     doc.save(output_path)
     print(f"✅ 저장 완료: {output_path}")
 
