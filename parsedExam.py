@@ -6,8 +6,12 @@ from docx.oxml.text.paragraph import CT_P
 from docx.oxml.table import CT_Tbl
 from docx.table import Table
 from docx.text.paragraph import Paragraph
+import pyimgur
+from io import BytesIO
+import requests
 
-# 블록 순회
+IMGUR_CLIENT_ID = "00ff8e726eb9eb8"
+
 def iter_block_items(parent):
     parent_elm = parent.element.body
     for child in parent_elm.iterchildren():
@@ -16,7 +20,6 @@ def iter_block_items(parent):
         elif isinstance(child, CT_Tbl):
             yield Table(child, parent)
 
-# 문단이 표 안에 있는지 여부
 def is_paragraph_in_table(paragraph: Paragraph):
     parent = paragraph._element
     while parent is not None:
@@ -25,70 +28,68 @@ def is_paragraph_in_table(paragraph: Paragraph):
         parent = parent.getparent()
     return False
 
+def upload_image_to_imgur(image_bytes, ext):
+    headers = {"Authorization": f"Client-ID {IMGUR_CLIENT_ID}"}
+    data = {"image": image_bytes}
+    response = requests.post("https://api.imgur.com/3/image", headers=headers, files={"image": image_bytes})
+    
+    if response.status_code == 200:
+        link = response.json()["data"]["link"]
+        print("✅ 업로드 성공:", link)
+        return link
+    else:
+        print("❌ 업로드 실패:", response.status_code, response.text)
+        return None
+    
+# 이미지 파일 테스트
+with open("test_image.png", "rb") as f:
+    img_bytes = f.read()
+    url = upload_image_to_imgur(img_bytes, ext=".png")
+    print("✅ 업로드 URL:", url)
+
+def extract_image_url_from_paragraph(paragraph):
+    for run in paragraph.runs:
+        drawing = run._element.find(".//w:drawing", namespaces=run._element.nsmap)
+        if drawing is not None:
+            blip = drawing.find(".//a:blip", namespaces={"a": "http://schemas.openxmlformats.org/drawingml/2006/main"})
+            if blip is None:
+                print("❌ blip (a:blip) not found in drawing")
+                continue
+            rId = blip.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed")
+            if not rId:
+                print("❌ No embed ID (r:embed) found in blip")
+                continue
+            if rId not in paragraph.part.related_parts:
+                print(f"❌ rId {rId} not found in related_parts")
+                continue
+            image_part = paragraph.part.related_parts[rId]
+            image_bytes = image_part.blob
+            url = upload_image_to_imgur(image_bytes, ext=".png")
+            print(f"✅ 이미지 업로드 성공: {url}")
+            return url
+    return None
+
+
+
 def extract_answer_map_from_table(table):
-    CHOICE_MAP = {"①": 1, "②": 2, "③": 3, "④": 4}
     answer_map = {}
     rows = table.rows
-    for i in range(0, len(rows), 2):  # 두 행씩 묶기
-        if i + 1 >= len(rows):
-            break  # 짝이 안 맞는 경우 방지
-
-        number_cells = rows[i].cells
-        answer_cells = rows[i + 1].cells
-
-        for nc, ac in zip(number_cells, answer_cells):
-            qnum_text = nc.text.strip()
-            print(qnum_text)
-            ans_text = ac.text.strip()
-            print(ans_text)
-
-            if not qnum_text:
-                continue
-
-            match = re.search(r"\d+", qnum_text)
-            if not match:
-                continue
-            qnum = int(match.group())
-
-            if ans_text in CHOICE_MAP:
-                answer_map[qnum] = CHOICE_MAP[ans_text]
-            else:
-                try:
-                    answer_map[qnum] = int(ans_text)
-                except ValueError:
-                    continue  # 정답값이 이상한 경우 skip
-
+    for i in range(0, len(rows), 2):
+        q_row = rows[i]
+        a_row = rows[i + 1] if i + 1 < len(rows) else None
+        if not a_row:
+            continue
+        for q_cell, a_cell in zip(q_row.cells, a_row.cells):
+            q_text = q_cell.text.strip()
+            a_text = a_cell.text.strip()
+            if q_text.isdigit() and a_text in "①②③④":
+                answer_map[int(q_text)] = "①②③④".index(a_text) + 1
     return answer_map
 
-
-# 정답표 추출 함수 (마지막 표)
-def extract_answer_map(doc):
-    tables = [tbl for tbl in iter_block_items(doc) if isinstance(tbl, Table)]
-    if not tables:
-        return {}
-
-    answer_table = tables[-1]
-    answers = {}
-    for row in answer_table.rows:
-        if len(row.cells) < 2:
-            continue
-        qnum_cell = row.cells[0].text.strip()
-        ans_cell = row.cells[1].text.strip()
-
-        try:
-            qnum = int(qnum_cell)
-            match = re.search(r"[①-④]", ans_cell)
-            if match:
-                answers[qnum] = "①②③④".index(match.group(0)) + 1
-        except:
-            continue
-    return answers
-
-# 문제, 선택지, 과목 파싱
 def parse_exam_doc(doc_path):
     doc = Document(doc_path)
     paragraphs = [p for p in iter_block_items(doc) if isinstance(p, Paragraph)]
-    answer_map = extract_answer_map_from_table(doc.tables[-1])  # 마지막 표가 정답표
+    answer_map = extract_answer_map_from_table(doc.tables[-1])
 
     results = []
     current_subject = None
@@ -99,16 +100,14 @@ def parse_exam_doc(doc_path):
     for para in paragraphs:
         text = para.text.strip()
 
-        # 과목
         if text.startswith("(Subject)") and text.endswith("(Subject)"):
             subject_content = text.replace("(Subject)", "").strip()
-            match = re.match(r"(\d+과목)\s*:\s*(.+)", subject_content)
+            match = re.match(r"(\d+\uACFC\uBAA9)\s*:\s*(.+)", subject_content)
             if match:
                 current_subject_number = match.group(1)
                 current_subject = match.group(2)
             continue
 
-        # 문제 시작
         if text == "<<<QUESTION>>>":
             if current_question:
                 results.append(current_question)
@@ -118,6 +117,7 @@ def parse_exam_doc(doc_path):
                 "question_number": None,
                 "question_text": "",
                 "has_image": False,
+                "image_url": None,
                 "choices": []
             }
             is_question_block = True
@@ -138,9 +138,8 @@ def parse_exam_doc(doc_path):
 
                 if any("graphic" in run._element.xml for run in para.runs):
                     current_question["has_image"] = True
-            continue
 
-        # 선택지
+
         if "[choice]" in text or text.startswith(("①", "②", "③", "④")):
             choice_text = para.text.strip()
             match = re.match(r"(\[choice\])?\s*(①|②|③|④)\s*(.*)", choice_text)
@@ -153,7 +152,6 @@ def parse_exam_doc(doc_path):
     if current_question:
         results.append(current_question)
 
-    # 정답 매핑 추가
     for q in results:
         qnum = q["question_number"]
         q["answer_number"] = answer_map.get(qnum)
@@ -165,25 +163,33 @@ def parse_exam_doc(doc_path):
 
     return results
 
+if __name__ == "__main__":
+    docx_path = "marked00_가스기사20200606.docx"
+    parsed = parse_exam_doc(docx_path)
+    
 
-# 실행
-docx_path = "marked00_가스기사20200606.docx"
-parsed_data = parse_exam_doc(docx_path)
+    df_questions = pd.DataFrame([
+        {
+            "과목번호": q["subject_number"],
+            "과목명": q["subject"],
+            "문제번호": q["question_number"],
+            "문제텍스트": q["question_text"].strip(),
+            "이미지포함": "true" if q["has_image"] else "false",
+            "이미지URL": q["image_url"] or ""
+        }
+        for q in parsed
+    ])
 
-df = pd.DataFrame([
-    {
-        "과목번호": q["subject_number"],
-        "과목명": q["subject"],
-        "문제번호": q["question_number"],
-        "문제텍스트": q["question_text"].strip(),
-        "이미지포함": "true" if q["has_image"] else "false",
-        "선택지번호": num,
-        "선택지내용": text,
-        "정답번호": q["answer_number"],
-        "정답여부": "true" if is_correct else "false"
-    }
-    for q in parsed_data for num, text, is_correct in q["choices"]
-])
+    df_choices = pd.DataFrame([
+        {
+            "문제번호": q["question_number"],
+            "선택지번호": num,
+            "선택지내용": text,
+            "정답여부": "true" if is_correct else "false"
+        }
+        for q in parsed for num, text, is_correct in q["choices"]
+    ])
 
-df.to_excel("parsed_exam.xlsx", index=False)
-print("✅ Excel 파일 저장 완료")
+    df_questions.to_excel("questions.xlsx", index=False)
+    df_choices.to_excel("choices.xlsx", index=False)
+    print("✅ Excel 저장 완료: questions.xlsx, choices.xlsx")
