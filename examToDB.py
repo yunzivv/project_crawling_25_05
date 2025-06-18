@@ -45,20 +45,10 @@ def replace_filled_numbers(paragraph, counter):
         for filled, unfilled in filled_to_unfilled.items():
             if filled in run.text:
                 run.text = run.text.replace(filled, unfilled)
-                run.bold = False  # 굵기 제거
+                run.bold = False
                 counter[0] += 1
 
-# <<<QUESTION>>> 삽입
-def insert_question_markers(paragraphs):
-    for p in paragraphs:
-        text = p.text.strip()
-        if not text:
-            continue
-        bold = any(run.bold for run in p.runs if run.text.strip())
-        if bold and re.match(r"^\d+\.\s", text):
-            insert_paragraph_before(p, "<<<QUESTION>>>")
-
-# 안내문 삭제
+# CBT 안내문 제거
 def remove_cbt_notice(paragraphs):
     start_idx, end_idx = None, None
     for i, p in enumerate(paragraphs):
@@ -68,7 +58,6 @@ def remove_cbt_notice(paragraphs):
         if start_idx is not None and text.endswith("확인하세요."):
             end_idx = i
             break
-
     if start_idx is not None and end_idx is not None:
         for i in range(start_idx, end_idx + 1):
             paragraphs[i]._element.getparent().remove(paragraphs[i]._element)
@@ -76,52 +65,28 @@ def remove_cbt_notice(paragraphs):
     else:
         print("⚠️ 안내문 텍스트를 찾지 못했습니다.")
 
-
-# 과목 텍스트에 (Subject) 추가
-def is_paragraph_in_table(paragraph):
-    parent = paragraph._element
-    while parent is not None:
-        if parent.tag.endswith("tbl"):
-            return True
-        parent = parent.getparent()
-    return False
-
-def mark_subject_titles(paragraphs):
-    subject_count = 0
-    for para in paragraphs:
-        if is_paragraph_in_table(para):  # 표 내부에 있는 문단인지 확인
-            is_bold = any(run.bold for run in para.runs if run.text.strip())
-            if is_bold and para.text.strip():
-                para.text = f"(Subject) {para.text.strip()} (Subject)"
-                subject_count += 1
-    print(f"🏷️ 과목 마킹 완료: 총 {subject_count}개")
-
-
-# 굵은 문단 수 세기 + (Bold) 표시
-def count_bold_paragraphs(paragraphs):
+# 과목표 제거 및 텍스트만 남기기
+def convert_subject_tables(doc):
+    tables = list(iter_block_items(doc))
     count = 0
-    for para in paragraphs:
-        if any(run.bold for run in para.runs if run.text.strip()):
-            para.add_run(" (Bold)")
-            count += 1
-    print(f"📝 굵은 글씨체 문단 수: {count}")
+    for i, tbl in enumerate(tables):
+        if not isinstance(tbl, Table):
+            continue
+        if i == len(tables) - 1:
+            continue  # 마지막 정답표는 무시
+        if len(tbl.rows) == 1 and len(tbl.rows[0].cells) == 1:
+            cell = tbl.rows[0].cells[0]
+            cell_text = cell.text.strip()
+            if cell_text:
+                first_para = cell.paragraphs[0]
+                first_para.text = f"(Subject) {cell_text} (Subject)"
+                tbl._element.getparent().insert(tbl._element.getparent().index(tbl._element), first_para._element)
+                tbl._element.getparent().remove(tbl._element)
+                count += 1
+    print(f"🧹 과목표 변환 및 삭제 완료: {count}개")
 
-# 메인 실행
-def main(path):
-    title, date = extract_title_info(path)
-    print(f"\n📄 문서: {os.path.basename(path)}")
-    doc = Document(path)
-
-    # ✅ 문단 리스트 추출
-    paragraphs = []
-    for b in iter_block_items(doc):
-        if isinstance(b, Paragraph):
-            paragraphs.append(b)
-
-    # 1. 안내문 삭제
-    remove_cbt_notice(paragraphs)
-
-    # 2. 문단 다시 추출 (삭제 후 반영)
+# <<<QUESTION>>> 삽입 및 번호 변환
+def insert_question_and_convert(doc):
     paragraphs = []
     for b in iter_block_items(doc):
         if isinstance(b, Paragraph):
@@ -133,24 +98,52 @@ def main(path):
                         paragraphs.append(para)
 
     print(f"\n📄 전체 문단 수: {len(paragraphs)}")
-
-    # 3. 채워진 번호 변환
     counter = [0]
     for p in paragraphs:
+        text = p.text.strip()
+        if not text:
+            continue
         replace_filled_numbers(p, counter)
+        bold = any(run.bold for run in p.runs if run.text.strip())
+        if bold and re.match(r"^\d+\.\s", text):
+            insert_paragraph_before(p, "<<<QUESTION>>>")
     print(f"✅ 숫자 변환: 총 {counter[0]}개")
+    return paragraphs
 
-    # 4. <<<QUESTION>>> 삽입
-    insert_question_markers(paragraphs)
+# 굵은 문단 표시 (과목과 문제용)
+def mark_bold_paragraphs(paragraphs):
+    count = 0
+    subject = 0
+    for para in paragraphs:
+        text = para.text.strip()
+        if text.startswith("(Subject)") and text.endswith("(Subject)"):
+            subject += 1
+        elif any(run.bold for run in para.runs if run.text.strip()):
+            para.add_run(" (Bold)")
+            count += 1
+    print(f"📝 굵은 글씨체 문단 수: {count}")
+    print(f"📝 과목 수: {subject}")
 
-    # 5. 과목 표시 (Subject) 삽입
-    mark_subject_titles(paragraphs)
+# 메인 실행
+def main(path):
+    title, date = extract_title_info(path)
+    print(f"\n📄 문서: {os.path.basename(path)}")
+    doc = Document(path)
 
-    # 6. 굵기 문단 수 세기
-    count_bold_paragraphs(paragraphs)
+    # 안내문 삭제 먼저
+    all_paragraphs = [p for b in iter_block_items(doc) if isinstance(b, Paragraph) for p in [b]]
+    remove_cbt_notice(all_paragraphs)
 
-    # 7. 저장
-    output_path = f"marked6_{os.path.basename(path)}"
+    # 과목표 -> 텍스트로 변환 후 삭제
+    convert_subject_tables(doc)
+
+    # 문제 마킹 및 숫자 변환
+    paragraphs = insert_question_and_convert(doc)
+
+    # 굵은 글씨체 마킹
+    mark_bold_paragraphs(paragraphs)
+
+    output_path = f"marked7_{os.path.basename(path)}"
     doc.save(output_path)
     print(f"✅ 저장 완료: {output_path}")
 
