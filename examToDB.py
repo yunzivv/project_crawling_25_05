@@ -76,6 +76,27 @@ def remove_cbt_notice(paragraphs):
     else:
         print("⚠️ 안내문 텍스트를 찾지 못했습니다.")
 
+
+# 과목 텍스트에 (Subject) 추가
+def is_paragraph_in_table(paragraph):
+    parent = paragraph._element
+    while parent is not None:
+        if parent.tag.endswith("tbl"):
+            return True
+        parent = parent.getparent()
+    return False
+
+def mark_subject_titles(paragraphs):
+    subject_count = 0
+    for para in paragraphs:
+        if is_paragraph_in_table(para):  # 표 내부에 있는 문단인지 확인
+            is_bold = any(run.bold for run in para.runs if run.text.strip())
+            if is_bold and para.text.strip():
+                para.text = f"(Subject) {para.text.strip()} (Subject)"
+                subject_count += 1
+    print(f"🏷️ 과목 마킹 완료: 총 {subject_count}개")
+
+
 # 굵은 문단 수 세기 + (Bold) 표시
 def count_bold_paragraphs(paragraphs):
     count = 0
@@ -122,11 +143,14 @@ def main(path):
     # 4. <<<QUESTION>>> 삽입
     insert_question_markers(paragraphs)
 
-    # 5. 굵기 문단 수 세기
+    # 5. 과목 표시 (Subject) 삽입
+    mark_subject_titles(paragraphs)
+
+    # 6. 굵기 문단 수 세기
     count_bold_paragraphs(paragraphs)
 
-    # 6. 저장
-    output_path = f"marked5_{os.path.basename(path)}"
+    # 7. 저장
+    output_path = f"marked6_{os.path.basename(path)}"
     doc.save(output_path)
     print(f"✅ 저장 완료: {output_path}")
 
