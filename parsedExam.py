@@ -58,10 +58,6 @@ def upload_image_to_imgur(image_bytes):
         print("❌ 이미지 처리 실패:", e)
         return None
 
-with open("test_image.jpg", "rb") as f:
-    url = upload_image_to_imgur(f.read())
-    print("✅ 업로드된 URL:", url)
-
 def extract_image_url_from_paragraph(paragraph):
     for run in paragraph.runs:
         drawing = run._element.find(".//w:drawing", namespaces=run._element.nsmap)
@@ -151,9 +147,11 @@ def parse_exam_doc(doc_path):
 
                 if any("graphic" in run._element.xml for run in para.runs):
                     current_question["has_image"] = True
-                    img_url = extract_image_url_from_paragraph(para)  # ⬅ 이 줄 추가
-                    if img_url:
-                        current_question["image_url"] = img_url
+                    # img_url = extract_image_url_from_paragraph(para)  # 이미지 업로드 잠시 중단
+                    # if img_url:
+                    #     current_question["image_url"] = img_url
+                    if any("graphic" in run._element.xml for run in para.runs): # 이미지 업로드 잠시 중단
+                        current_question["has_image"] = True
 
 
         if "[choice]" in text or text.startswith(("①", "②", "③", "④")):
@@ -190,6 +188,7 @@ def process_all_exam_files(input_folder):
 
     for filename in filenames:
         filepath = os.path.join(input_folder, filename)
+        print(filename)
         parsed_questions = parse_exam_doc(filepath)
 
         for q in parsed_questions:
@@ -203,7 +202,7 @@ def process_all_exam_files(input_folder):
                 "문제번호": q["question_number"],
                 "문제텍스트": q["question_text"].strip(),
                 "이미지포함": "true" if q["has_image"] else "false",
-                "이미지URL": q["image_url"] or ""
+                "이미지URL": "" # 원래: q["image_url"] or ""
             })
 
             for num, text, is_correct in q["choices"]:
