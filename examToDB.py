@@ -36,7 +36,7 @@ def insert_paragraph_before(paragraph, text):
     new_para.add_run(text)
     return new_para
 
-# <<<QUESTION>>> 및 [[[과목]]] 삽입
+# <<<QUESTION>>> 삽입
 
 def insert_question_and_subject_markers(doc):
     paragraphs = []
@@ -61,6 +61,8 @@ def insert_question_and_subject_markers(doc):
         if bold and re.match(r"^\d+\.\s", text):
             insert_paragraph_before(p, "<<<QUESTION>>>")
 
+
+
 # 메인 실행
 
 def main(path):
@@ -68,7 +70,7 @@ def main(path):
     print(f"\n📄 문서: {os.path.basename(path)}")
     doc = Document(path)
     insert_question_and_subject_markers(doc)
-    output_path = f"marked_{os.path.basename(path)}"
+    output_path = f"marked2_{os.path.basename(path)}"
     doc.save(output_path)
     print(f"✅ 저장 완료: {output_path}")
 
