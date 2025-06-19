@@ -1,0 +1,12 @@
+
+CLOUDINARY_URL=cloudinary://<your_api_key>:<your_api_secret>@dc12fahac
+622374682885518
+_lJN1N_PoOkviAcZ77RMsUnIbfQ
+
+CLOUDINARY_URL=cloudinary://<your_api_key>:<your_api_secret>@dnpiyrk6n
+692131124971581
+6PVShhV1FNoqNy5IBrjVzwtITxw
+
+CLOUDINARY_URL=cloudinary://<your_api_key>:<your_api_secret>@duyepqc2e
+336161591162649
+o7xQn166trb0WHu7tsOTZstJeDM
