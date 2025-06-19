@@ -26,8 +26,9 @@ headers = {
 }
 
 # AI·개발·데이터 > 웹개발자 완료 1795
-dutyCtgr = "10031"
-duty = "1000267"
+dutyCtgr = "10033"
+duty = "1000266"
+
 
 payload = {
     "condition": {
@@ -41,6 +42,7 @@ payload = {
     "TotalCount": 3198,
     "Page": 3,
     "PageSize": 234
+
 }
 
 # 세션 생성 -> headers 추가 -> POST 방식으로 요청 보내기
