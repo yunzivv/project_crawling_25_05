@@ -286,21 +286,34 @@ def parse_exam_doc(doc_path):
 
     return results
 
-def process_all_exam_files(input_folder):
+def process_all_exam_files(input_folder, start_index=100, end_index=250):
     all_questions = []
     all_choices = []
 
-    exam_id = 1
-    question_id_counter = 1
+    # 기존 파일 로딩
+    if os.path.exists("questions.xlsx") and os.path.exists("choices.xlsx"):
+        df_questions_existing = pd.read_excel("questions.xlsx")
+        df_choices_existing = pd.read_excel("choices.xlsx")
+        print("📂 기존 엑셀 파일 로드 완료")
 
-    filenames = sorted([f for f in os.listdir(input_folder) if f.endswith('.docx')])[:100]
+        last_exam_id = df_questions_existing["시험ID"].max()
+        last_question_id = df_questions_existing["문제ID"].max()
+    else:
+        df_questions_existing = pd.DataFrame()
+        df_choices_existing = pd.DataFrame()
+        last_exam_id = 0
+        last_question_id = 0
+
+    exam_id = last_exam_id + 1
+    question_id_counter = last_question_id + 1
+
+    filenames = sorted([f for f in os.listdir(input_folder) if f.endswith('.docx')])[start_index:end_index]
 
     for filename in filenames:
         filepath = os.path.join(input_folder, filename)
         print(filename)
         parsed_questions = parse_exam_doc(filepath)
 
-        # 시험명과 날짜 추출 (예: '가스기사20200606' → '가스기사', '20200606')
         basename = os.path.splitext(filename)[0]
         match = re.match(r"([^\d]+)(\d{8})", basename)
         if match:
@@ -310,7 +323,7 @@ def process_all_exam_files(input_folder):
             cert_name = ""
             exam_date = ""
 
-        print(f"▶️ 현재 파일: {filename}, 자격증명: {cert_name}, 시험일자: {exam_date}, 문제 수: {len(parsed_questions)}")
+        print(f"▶️ 파일: {filename}, 자격증명: {cert_name}, 시험일자: {exam_date}, 문제 수: {len(parsed_questions)}")
 
         for q in parsed_questions:
             current_qid = question_id_counter
@@ -343,13 +356,18 @@ def process_all_exam_files(input_folder):
 
         exam_id += 1
 
-    df_questions = pd.DataFrame(all_questions)
-    df_choices = pd.DataFrame(all_choices)
+    # 새로운 데이터프레임 생성
+    df_new_questions = pd.DataFrame(all_questions)
+    df_new_choices = pd.DataFrame(all_choices)
 
-    df_questions.to_excel("questions.xlsx", index=False)
-    df_choices.to_excel("choices.xlsx", index=False)
-    print("✅ 전체 시험 Excel 저장 완료: questions.xlsx, choices.xlsx")
+    # 기존 데이터와 병합
+    df_questions_final = pd.concat([df_questions_existing, df_new_questions], ignore_index=True)
+    df_choices_final = pd.concat([df_choices_existing, df_new_choices], ignore_index=True)
+
+    df_questions_final.to_excel("questions.xlsx", index=False)
+    df_choices_final.to_excel("choices.xlsx", index=False)
+    print("✅ 추가 데이터 저장 완료: questions.xlsx, choices.xlsx")
 
 
 if __name__ == "__main__":
-    process_all_exam_files("기출문제포맷")    
+    process_all_exam_files("기출문제포맷", start_index=100, end_index=250) 
