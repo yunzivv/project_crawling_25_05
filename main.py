@@ -27,7 +27,7 @@ headers = {
 
 # AI·개발·데이터 > 웹개발자 완료 1795
 dutyCtgr = "10033"
-duty = "1000266"
+duty = "1000268"
 
 
 payload = {
@@ -39,9 +39,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 3198,
-    "Page": 5,
-    "PageSize": 234
+    "TotalCount": 1851,
+    "Page": 4,
+    "PageSize": 310
 
 }
 
