@@ -8,6 +8,7 @@ from datetime import datetime
 
 # 엑셀 로드
 df = pd.read_excel("subjects.xlsx")
+df = df.reset_index(drop=True) 
 
 # DB 연결
 db_url = "mysql+pymysql://root@localhost:3306/project_25_05"

@@ -6,7 +6,7 @@ from datetime import datetime
 # python choicesToDB.py
 
 # 엑셀 읽기
-df = pd.read_excel('choicesToDBTest.xlsx')
+df = pd.read_excel('choices.xlsx')
 
 print(df.columns)  # 컬럼 구조 확인
 
