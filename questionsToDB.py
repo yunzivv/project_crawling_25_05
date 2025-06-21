@@ -6,37 +6,62 @@ from datetime import datetime
 # python questionsToDB.py
 
 # 엑셀 파일 읽기
-df = pd.read_excel('questionsToDBTest.xlsx')
+df = pd.read_excel('questions.xlsx')
 
+# INSERT용 컬럼 확인
 print("📄 엑셀 컬럼:", df.columns.tolist())
 
-# DB 연결
 db_url = "mysql+pymysql://root@localhost:3306/project_25_05"
 engine = create_engine(db_url)
 
-# 필요한 컬럼만 추출 (테이블 컬럼과 일치)
-columns_needed = ['id', 'certId', 'examId', 'subjectId', 'questNum', 'body', 'hasImage', 'imgUrl']
-df_filtered = df[columns_needed].dropna(subset=['id', 'examId', 'questNum', 'body'])
+# certificate 테이블에서 certName → id 매핑 가져오기
+with engine.connect() as conn:
+    cert_rows = conn.execute(text("SELECT id, name FROM certificate")).mappings().fetchall()
+    cert_map = {row['name']: row['id'] for row in cert_rows}
 
-# INSERT 실행
-with engine.begin() as conn:
+    subject_rows = conn.execute(text("SELECT id, name FROM certSubject")).mappings().fetchall()
+    subject_map = {row['name']: row['id'] for row in subject_rows}
+
+    
+# certId 매핑
+df['certId'] = df['certName'].map(cert_map)
+df['subjectId'] = df['subjectName'].map(subject_map)
+
+# 누락된 certName 확인
+missing = df[df['certId'].isna()]
+if not missing.empty:
+    print("❌ 매핑되지 않은 certName:")
+    print(missing['certName'].drop_duplicates())
+    df = df[~df['certId'].isna()]  # 매핑된 것만 남김
+
+missing = df[df['subjectId'].isna()]
+if not missing.empty:
+    print("❌ 매핑되지 않은 subjectName:")
+    print(missing['subjectName'].drop_duplicates())
+    df = df[~df['subjectId'].isna()]  # 매핑된 것만 남김
+
+
+# 컬럼 정제 및 DB 저장
+df_filtered = df[['id', 'certId', 'examId', 'subjectId', 'questNum', 'body', 'hasImage', 'imgUrl']].dropna()
+
+with engine.begin()  as conn:
     for _, row in df_filtered.iterrows():
         stmt = text("""
-            INSERT INTO questions (
-                id, certId, examId, subjectId, questNum, body, hasImage, imgUrl, regDate, updateDate
-            ) VALUES (
-                :id, :certId, :examId, :subjectId, :questNum, :body, :hasImage, :imgUrl, NOW(), NOW()
-            )
+            INSERT INTO questions (id, certId, examId, subjectId, questNum, 
+                    body, hasImage, imgUrl, regDate, updateDate)
+            VALUES (:id, :certId, :examId, :subjectId, :questNum, 
+                    :body, :hasImage, :imgUrl, NOW(), NOW())
         """)
         conn.execute(stmt, {
             "id": int(row["id"]),
-            "certId": int(row["certId"]) if not pd.isna(row["certId"]) else None,
+            "certId": int(row["certId"]),
             "examId": int(row["examId"]),
-            "subjectId": int(row["subjectId"]) if not pd.isna(row["subjectId"]) else None,
+            "subjectId": int(row["subjectId"]),
             "questNum": int(row["questNum"]),
             "body": str(row["body"]),
             "hasImage": bool(row["hasImage"]),
-            "imgUrl": str(row["imgUrl"]) if not pd.isna(row["imgUrl"]) else None
+            "imgUrl": str(row["imgUrl"])
         })
+    conn.commit()
 
-print("✅ questions 테이블에 저장 완료!")
+print("✅ DB 저장 완료!")
