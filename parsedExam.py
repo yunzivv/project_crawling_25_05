@@ -225,26 +225,26 @@ def parse_exam_doc(doc_path):
     return results
 
 
-def process_all_exam_files(input_folder, start_index=250, end_index=380):
+def process_all_exam_files(input_folder, start_index=500, end_index=501):
     all_questions = []
-    all_choices = []
+    # all_choices = []
 
     # 기존 파일 로딩
     if os.path.exists("questions.xlsx") and os.path.exists("choices.xlsx"):
 
         df_questions_existing = pd.read_excel("questions.xlsx")
-        df_choices_existing = pd.read_excel("choices.xlsx")
+        # df_choices_existing = pd.read_excel("choices.xlsx")
         print("📂 기존 엑셀 파일 로드 완료")
 
-        last_exam_id = df_questions_existing["시험ID"].max()
-        last_question_id = df_questions_existing["문제ID"].max()
+        last_exam_id = df_questions_existing["examId"].max()
+        last_question_id = df_questions_existing["id"].max()
 
         print(last_exam_id)
         print(last_question_id)
 
     else:
         df_questions_existing = pd.DataFrame()
-        df_choices_existing = pd.DataFrame()
+        # df_choices_existing = pd.DataFrame()
         last_exam_id = 0
         last_question_id = 0
 
@@ -285,16 +285,16 @@ def process_all_exam_files(input_folder, start_index=250, end_index=380):
                 "imgUrl": q["image_url"] or ""
             })
 
-            for num, text, is_correct in q["choices"]:
-                all_choices.append({
-                    "자격증명": cert_name,
-                    "시험일자": exam_date,
-                    "시험ID": exam_id,
-                    "문제ID": current_qid,
-                    "선택지번호": num,
-                    "선택지내용": text,
-                    "정답여부": "true" if is_correct else "false"
-                })
+            # for num, text, is_correct in q["choices"]:
+            #     all_choices.append({
+            #         "자격증명": cert_name,
+            #         "시험일자": exam_date,
+            #         "시험ID": exam_id,
+            #         "문제ID": current_qid,
+            #         "선택지번호": num,
+            #         "선택지내용": text,
+            #         "정답여부": "true" if is_correct else "false"
+            #     })
 
             question_id_counter += 1
 
@@ -302,16 +302,16 @@ def process_all_exam_files(input_folder, start_index=250, end_index=380):
 
     # 새로운 데이터프레임 생성
     df_new_questions = pd.DataFrame(all_questions)
-    df_new_choices = pd.DataFrame(all_choices)
+    # df_new_choices = pd.DataFrame(all_choices)
 
     # 기존 데이터와 병합
     df_questions_final = pd.concat([df_questions_existing, df_new_questions], ignore_index=True)
-    df_choices_final = pd.concat([df_choices_existing, df_new_choices], ignore_index=True)
+    # df_choices_final = pd.concat([df_choices_existing, df_new_choices], ignore_index=True)
 
     df_questions_final.to_excel("questions.xlsx", index=False)
-    df_choices_final.to_excel("choices.xlsx", index=False)
+    # df_choices_final.to_excel("choices.xlsx", index=False)
     print("✅ 추가 데이터 저장 완료: questions.xlsx, choices.xlsx")
 
 
 if __name__ == "__main__":
-    process_all_exam_files("기출문제포맷", start_index=250, end_index=380)
+    process_all_exam_files("기출문제포맷", start_index=500, end_index=501)
