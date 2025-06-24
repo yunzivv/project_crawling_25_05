@@ -25,9 +25,9 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# AI·개발·데이터 > 웹개발자 완료 1795
+# 영업 > 금융영업 완료 953
 dutyCtgr = "10035"
-duty = "1000280"
+duty = "1000282"
 
 
 payload = {
@@ -39,9 +39,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 828,
-    "Page": 4,
-    "PageSize": 280
+    "TotalCount": 1422,
+    "Page": 7,
+    "PageSize": 204
 
 }
 
