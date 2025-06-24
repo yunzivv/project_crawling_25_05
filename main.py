@@ -27,7 +27,7 @@ headers = {
 
 # 영업 > 금융영업 완료 953
 dutyCtgr = "10035"
-duty = "1000282"
+duty = "1000283"
 
 
 payload = {
@@ -39,9 +39,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 1422,
-    "Page": 7,
-    "PageSize": 204
+    "TotalCount": 2307,
+    "Page": 5,
+    "PageSize": 231
 
 }
 
