@@ -25,9 +25,8 @@ headers = {
     "Accept-Encoding": "gzip, deflate, br"
 }
 
-# 영업 > 금융영업 완료 953
-dutyCtgr = "10039"
-duty = "1000320"
+dutyCtgr = "10039" # 직무 카테고리
+duty = "1000320"   # 직무 코드
 
 
 payload = {
@@ -39,9 +38,9 @@ payload = {
         "dutySelect": [duty],
         "isAllDutySearch": False
     },
-    "TotalCount": 269,
-    "Page": 1,
-    "PageSize": 269
+    "TotalCount": 269,  # 해당 직무 전체 공고 수
+    "Page": 1,          # 페이징
+    "PageSize": 269     # 한 페이지당 공고 수
 
 }
 

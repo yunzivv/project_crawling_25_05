@@ -11,8 +11,6 @@ from docx.table import Table
 from docx.text.paragraph import Paragraph
 from PIL import Image
 from io import BytesIO
-import base64
-import requests
 import time
 import pyimgur
 import cloudinary
@@ -67,7 +65,7 @@ def upload_image_to_cloudinary(image_bytes, max_retries=3):
                 print(f"⚠️ Cloudinary 오류 발생 (시도 {attempt}/{max_retries}): {e}")
                 time.sleep(5) 
     except Exception as e:
-        print("❌ 이미지 처리 오류 (PIL 등):", e)
+        print("❌ 이미지 처리 오류:", e)
 
     return None
 
