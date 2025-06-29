@@ -5,6 +5,7 @@ import os
 
 
 # ocr-env_api
+# openAPIToDB.py
 # ▶️ API 기본 정보
 url = "http://openapi.q-net.or.kr/api/service/rest/InquiryQualInfo/getList"
 params = {
