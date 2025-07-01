@@ -21,7 +21,7 @@ df_filtered = df[['id', 'questId', 'label', 'body', 'isCorrect']].dropna()
 with engine.connect() as conn:
     for _, row in df_filtered.iterrows():
         stmt = text("""
-            INSERT INTO choices2 (id, questId, label, body, isCorrect, regDate, updateDate)
+            INSERT INTO choices (id, questId, label, body, isCorrect, regDate, updateDate)
             VALUES (:id, :questId, :label, :body, :isCorrect, NOW(), NOW())
         """)
         conn.execute(stmt, {

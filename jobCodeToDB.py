@@ -4,7 +4,7 @@ from datetime import datetime
 
 # ocr-env_db
 # 엑셀 읽기
-df = pd.read_excel('jobkorea_jobCode DB 데이터.xlsx')
+df = pd.read_excel('jobkorea_jobCode.xlsx')
 
 print(df.columns)  # 컬럼 구조 확인
 
