@@ -2,7 +2,9 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from datetime import datetime
 
-# ocr-env_db
+# ocr-env_db\Scripts\activate
+# python certToDB.py
+
 # 엑셀 파일 읽기
 df = pd.read_excel('certList.xlsx') 
 print(df.columns)

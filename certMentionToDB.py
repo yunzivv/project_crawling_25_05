@@ -1,9 +1,11 @@
 import pandas as pd
 from sqlalchemy import create_engine, text
 
-# ocr-env_db
+# ocr-env_db\Scripts\activate
+# python certMentionToDB.py
+
 # 1. 엑셀 파일 읽기
-df = pd.read_excel('매핑완료_4916.xlsx')
+df = pd.read_excel('매핑.xlsx')
 
 # 2. certId가 null인 행 제외
 df_filtered = df[df['certId'].notnull()].copy()

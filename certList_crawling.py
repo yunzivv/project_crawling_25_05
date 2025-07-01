@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 
 # ocr-env_certList
+# certList_crawling.py
 
 url = "https://www.pqi.or.kr/inf/qul/infQulNanLis.do"
 headers = {

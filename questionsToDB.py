@@ -51,7 +51,7 @@ df_filtered = df_filtered.dropna(subset=['id', 'certId', 'examId', 'subjectId', 
 with engine.begin() as conn:
     for _, row in df_filtered.iterrows():
         stmt = text("""
-            INSERT INTO questions (
+            INSERT INTO questions2 (
                 id, certId, examId, subjectId, questNum, body, hasImage, imgUrl, regDate, updateDate
             ) VALUES (
                 :id, :certId, :examId, :subjectId, :questNum, :body, :hasImage, :imgUrl, NOW(), NOW()
